@@ -257,6 +257,19 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
         </div>
       </div>
 
+      <!-- AUDIO & COMMENTARY CONTROLS -->
+      <div style="background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 15px;">
+        <h3 style="color: #fff; font-family: 'Russo One'; font-size: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">🎧 AUDIO & COMMENTARY</h3>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <button class="btn btn-sm" id="cfgCommentaryBtn" onclick="cycleCommentaryMode(); updateCommentarySettings();">COMMENTARY: TEXT</button>
+          <button class="btn btn-sm" id="cfgCrowdBtn" onclick="toggleCrowdNoise();">CROWD NOISE: ON</button>
+          <div>
+            <label style="display: flex; justify-content: space-between; font-size: 11px; color: var(--muted);">STADIUM ENERGY <span id="crowdVolLbl">50%</span></label>
+            <input type="range" id="cfgCrowdVol" min="0" max="100" value="50" oninput="updateCrowdVolume(this.value)" style="width: 100%;">
+          </div>
+        </div>
+      </div>
+
       <!-- SQUAD CONSTANTS CONTROLLER -->
       <div style="background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 15px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
@@ -535,6 +548,51 @@ document.getElementById('sndBtn').onclick=()=>{
 };
 document.getElementById('cmBtn').onclick=cycleCommentaryMode;
 
+const CrowdNoise={
+  _src:null,_gain:null,
+  on:true,
+  vol:.5,
+  init(){
+    const c=SFX.c; if(!c) return;
+    if(this._src) return;
+    try{
+      const sr=c.sampleRate;
+      const buf=c.createBuffer(1,sr*2,sr);
+      const data=buf.getChannelData(0);
+      for(let i=0;i<data.length;i++) data[i]=(Math.random()*2-1)*Math.pow(1-i/data.length,1.5);
+      const src=c.createBufferSource();
+      src.buffer=buf;src.loop=true;
+      const gain=c.createGain();gain.gain.value=this.on?this.vol:0;
+      src.connect(gain);gain.connect(c.destination);
+      src.start(0);
+      this._src=src;this._gain=gain;
+    }catch(e){}
+  },
+  toggle(){
+    this.on=!this.on;
+    if(!this._src && this.on) this.init();
+    if(this._gain) this._gain.gain.setValueAtTime(this.on?this.vol:0,this._gain.context.currentTime);
+    updateCrowdSettings();
+  },
+  setVolume(v){
+    this.vol=v;
+    if(this._gain) this._gain.gain.setValueAtTime(this.on?v:0,this._gain.context.currentTime);
+    updateCrowdSettings();
+  }
+};
+let bestVoice=null;
+function chooseBestVoice(){
+  const voices=window.speechSynthesis?.getVoices()||[];
+  if(!voices.length) return null;
+  const preferred=['en-GB','en-US','en'];
+  const exact=voices.find(v=>preferred.some(p=>v.lang.startsWith(p))&&/male|alex|daniel|english/.test(v.name.toLowerCase()));
+  if(exact) return exact;
+  const regional=voices.find(v=>preferred.some(p=>v.lang.startsWith(p)));
+  return regional||voices[0];
+}
+window.speechSynthesis?.addEventListener?.('voiceschanged',()=>{bestVoice=chooseBestVoice();});
+bestVoice=chooseBestVoice();
+
 // ═══════════════════════════════════════════════════════
 // COMMENTARY
 // ═══════════════════════════════════════════════════════
@@ -557,8 +615,45 @@ function speakCommentary(text){
   if(!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
   const utter=new SpeechSynthesisUtterance(text);
-  utter.rate=1.05;utter.pitch=1;utter.volume=1;
+  if(bestVoice) utter.voice=bestVoice;
+  utter.rate=1.05;utter.pitch=1.05;utter.volume=1;
   window.speechSynthesis.speak(utter);
+}
+function generateCommentary(type,custom){
+  if(custom) return custom;
+  const minute = Math.floor(matchTime/60);
+  const time = `${minute}'`;
+  const isHomeLeading = score[0] >= score[1];
+  const teamName = ['goal','lead','level','champ','gkp','save'].includes(type) ? (isHomeLeading?CFG.t1nm:CFG.t2nm) : '';
+  const phraseSets={
+    goal:[`${time} — WHAT A GOAL! ${pick(['The crowd are electric!','A finish from another planet!','That will be replayed again and again!'])}`,
+          `${time} — ${teamName} explode into the box and bury it!`,
+          `${time} — pure genius in front of goal!`],
+    save:[`${time} — what a reflex from the keeper!`,
+          `${time} — DENIED! brilliant stop!`,
+          `${time} — the keeper is keeping them in it!`],
+    tackle:[`${time} — clean challenge there!`,
+            `${time} — he cuts it out brilliantly!`,
+            `${time} — that was vital defending!`],
+    ko:[`${time} — and the match is underway!`,
+        `${time} — the whistle has gone and we are live!`],
+    near:[`${time} — so close to glory!`,
+          `${time} — that would have been inches away!`],
+    lead:[`${time} — they take the lead!`,
+          `${time} — suddenly the scoreboard changes!`],
+    level:[`${time} — back on level terms!`,
+           `${time} — what a response!`],
+    half:[`${time} — half time arrives. Catch your breath!`,
+          `${time} — a tense first half comes to an end!`],
+    full:[`${time} — full time, and what a spectacle!`,
+          `${time} — the whistle blows on an epic game!`],
+    gkp:[`${time} — keeper distribution looks sharp!`,
+         `${time} — good composure from the goalkeeper!`],
+    champ:[`${time} — CHAMPIONS! The crowd can barely contain themselves!`,
+           `${time} — an unforgettable triumph!`],
+  };
+  const lines=phraseSets[type]||CM[type]||[`${time} — ${type}`];
+  return pick(lines);
 }
 function updateCommentaryButton(){
   const btn=document.getElementById('cmBtn');
@@ -567,6 +662,18 @@ function updateCommentaryButton(){
   else if(commentaryMode==='audio') btn.textContent='🎙️';
   else btn.textContent='📝';
   btn.title = commentaryMode==='off' ? 'Commentary OFF' : commentaryMode==='audio' ? 'Audio Commentary' : 'Text Commentary';
+}
+function updateCommentarySettings(){
+  const btn=document.getElementById('cfgCommentaryBtn');
+  if(!btn) return;
+  const label = commentaryMode==='off' ? 'OFF' : commentaryMode==='audio' ? 'AUDIO' : 'TEXT';
+  btn.textContent = `COMMENTARY: ${label}`;
+}
+function updateCrowdSettings(){
+  const btn=document.getElementById('cfgCrowdBtn');
+  const lbl=document.getElementById('crowdVolLbl');
+  if(btn) btn.textContent = `CROWD NOISE: ${CrowdNoise.on ? 'ON' : 'OFF'}`;
+  if(lbl) lbl.textContent = `${Math.round(CrowdNoise.vol*100)}%`;
 }
 function hideCommentaryText(){
   cmTimer=0;
@@ -583,16 +690,24 @@ function cycleCommentaryMode(){
   }
   if(commentaryMode==='audio') hideCommentaryText();
   updateCommentaryButton();
+  updateCommentarySettings();
   toast(`Commentary ${commentaryMode.toUpperCase()}`);
+}
+function toggleCrowdNoise(){
+  CrowdNoise.toggle();
+  toast(`Crowd noise ${CrowdNoise.on ? 'ON' : 'OFF'}`);
+}
+function updateCrowdVolume(value){
+  const vol = clamp(value/100,0,1);
+  CrowdNoise.setVolume(vol);
 }
 function trigCM(type,custom){
   if(commentaryMode==='off'){
     hideCommentaryText();
     return;
   }
-  const lines=custom?[custom]:(CM[type]||[]);
-  if(!lines.length)return;
-  const line=pick(lines);
+  const line=generateCommentary(type,custom);
+  if(!line) return;
   if(commentaryMode==='audio'){
     speakCommentary(line);
     hideCommentaryText();
@@ -2673,7 +2788,10 @@ function selectTrnType(type) {
 // ═══════════════════════════════════════════════════════
 function init(){
   showScr('menuScreen');['signalScreen','endScreen','teamScreen','tournamentScreen'].forEach(hideScr);
-  applyTeams(0,1);createTeams();render();gs='menu';initMobile();updateCommentaryButton();
+  applyTeams(0,1);createTeams();render();gs='menu';initMobile();
+  updateCommentaryButton();
+  updateCommentarySettings();
+  updateCrowdSettings();
 }
 const fsBtn = document.getElementById("fsBtn");
 const exitBtn=document.getElementById("exitBtn");
