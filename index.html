@@ -9,7 +9,7 @@
 #exitBtn{
     position:fixed;
     top:12px;
-    right:100px;
+    right:144px;
     z-index:300;
     width:34px;
     height:34px;
@@ -26,6 +26,23 @@
 
 #exitBtn.vis{
     display:flex;
+}
+#cmBtn{
+    position:fixed;
+    top:12px;
+    right:100px;
+    z-index:300;
+    width:34px;
+    height:34px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    background:rgba(17,24,39,.88);
+    color:var(--fg);
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:18px;
 }
 #fsBtn{
     position:fixed;
@@ -282,6 +299,7 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
 <button id="trainingTrayToggle" style="position: fixed; top: 12px; left: 56px; z-index: 300; width: 34px; height: 34px; border-radius: 8px; border: 1px solid #06D6A0; background: rgba(10,21,16,.88); color: #06D6A0; cursor: pointer; display: none; align-items: center; justify-content: center; font-size: 15px;" onclick="toggleConfigTray(true)">🧪⚙️</button>
 
     <button id="exitBtn" title="Exit Match">🏠</button>
+<button id="cmBtn" title="Commentary Mode">🎙️</button>
 <button id="fsBtn" title="Fullscreen">⛶</button>
 <div id="rotMsg"><div class="ri">📱</div><p>ROTATE TO LANDSCAPE<br>TO PLAY STRKER</p></div>
 
@@ -366,10 +384,6 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
     <div class="end-lbl" id="eLbl"></div>
     <div class="end-stats" id="eStats"></div>
     <div class="t-msg" id="tMsg" style="display:none"></div>
-        <div class="btn-row" style="justify-content:center">
-      <button class="btn btn-p" id="btnEA" onclick="endAct()">▶ CONTINUE</button>
-      <button class="btn btn-sm" onclick="backMenu()">← MENU</button>
-    </div>
     <div class="btn-row" style="justify-content:center">
       <button class="btn btn-p" id="btnEA" onclick="endAct()">▶ CONTINUE</button>
       <button class="btn btn-sm" id="btnTacShow" onclick="showTacticalLogsOverlay()">📋 TACTICAL REPORT</button>
@@ -420,14 +434,14 @@ let shotAimY=0;
 // ═══════════════════════════════════════════════════════
 
 const TEAMS=[
-  {name:'FIRE FC',   c:'#E63946',gk:'#F9C74F',dk:'#7A0D14', st:{spd:1.0, sht:1.3, pas:1.0, def:0.7, gk:1.0}, desc:'Aggressive Attack'},
+  {name:'FIRE FC',   c:'#E63946',gk:'#F9C74F',dk:'#7A0D14', st:{spd:1.0, sht:1.0, pas:1.0, def:1.0, gk:1.0}, desc:'Aggressive Attack'},
   {name:'GOLD RUSH', c:'#FFD166',gk:'#06D6A0',dk:'#7A6100', st:{spd:1.0, sht:1.0, pas:1.0, def:1.0, gk:1.0}, desc:'Perfectly Balanced'},
-  {name:'OCEAN FC',  c:'#0096C7',gk:'#90E0EF',dk:'#004E70', st:{spd:1.0, sht:0.7, pas:1.3, def:1.0, gk:1.0}, desc:'Passing Masters'},
-  {name:'FOREST FC', c:'#2D9E5F',gk:'#95D5B2',dk:'#165C34', st:{spd:0.8, sht:1.0, pas:0.9, def:1.3, gk:1.0}, desc:'Brick Wall Defense'},
-  {name:'PURPLE',    c:'#7209B7',gk:'#C77DFF',dk:'#3D0060', st:{spd:1.2, sht:1.0, pas:1.0, def:1.0, gk:0.8}, desc:'Speed Demons'},
-  {name:'STORM FC',  c:'#3A86FF',gk:'#8ECAE6',dk:'#1040A0', st:{spd:1.0, sht:1.0, pas:0.8, def:0.9, gk:1.3}, desc:'Goalkeeper Titans'},
-  {name:'CRIMSON',   c:'#9B2226',gk:'#E9C46A',dk:'#500B0E', st:{spd:1.1, sht:0.9, pas:0.9, def:1.1, gk:1.0}, desc:'High Press'},
-  {name:'ARCTIC FC', c:'#9BB7D4',gk:'#457B9D',dk:'#4A6A80', st:{spd:0.9, sht:1.2, pas:1.1, def:0.8, gk:1.0}, desc:'Snipers'},
+  {name:'OCEAN FC',  c:'#0096C7',gk:'#90E0EF',dk:'#004E70', st:{spd:1.0, sht:1.0, pas:1.0, def:1.0, gk:1.0}, desc:'Passing Masters'},
+  {name:'FOREST FC', c:'#2D9E5F',gk:'#95D5B2',dk:'#165C34', st:{spd:1.0, sht:1.0, pas:1.0, def:1.0, gk:1.0}, desc:'Brick Wall Defense'},
+  {name:'PURPLE',    c:'#7209B7',gk:'#C77DFF',dk:'#3D0060', st:{spd:1.0, sht:1.0, pas:1.0, def:1.0, gk:1.0}, desc:'Speed Demons'},
+  {name:'STORM FC',  c:'#3A86FF',gk:'#8ECAE6',dk:'#1040A0', st:{spd:1.0, sht:1.0, pas:1.0, def:1.0, gk:1.0}, desc:'Goalkeeper Titans'},
+  {name:'CRIMSON',   c:'#9B2226',gk:'#E9C46A',dk:'#500B0E', st:{spd:1.0, sht:1.0, pas:1.0, def:1.0, gk:1.0}, desc:'High Press'},
+  {name:'ARCTIC FC', c:'#9BB7D4',gk:'#457B9D',dk:'#4A6A80', st:{spd:1.0, sht:1.0, pas:1.0, def:1.0, gk:1.0}, desc:'Snipers'},
 ];
 
 // Helper to quickly grab the active stats for Team 1 or Team 2
@@ -519,6 +533,7 @@ const SFX={
 document.getElementById('sndBtn').onclick=()=>{
   SFX.on=!SFX.on;document.getElementById('sndBtn').textContent=SFX.on?'🔊':'🔇';
 };
+document.getElementById('cmBtn').onclick=cycleCommentaryMode;
 
 // ═══════════════════════════════════════════════════════
 // COMMENTARY
@@ -537,16 +552,64 @@ const CM={
   champ:['TOURNAMENT CHAMPIONS!','They\'ve done it — CHAMPIONS!','AN UNBELIEVABLE TRIUMPH!'],
 };
 let cmTimer=0;
+let commentaryMode='text'; // text | audio | off
+function speakCommentary(text){
+  if(!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utter=new SpeechSynthesisUtterance(text);
+  utter.rate=1.05;utter.pitch=1;utter.volume=1;
+  window.speechSynthesis.speak(utter);
+}
+function updateCommentaryButton(){
+  const btn=document.getElementById('cmBtn');
+  if(!btn) return;
+  if(commentaryMode==='off') btn.textContent='🔇';
+  else if(commentaryMode==='audio') btn.textContent='🎙️';
+  else btn.textContent='📝';
+  btn.title = commentaryMode==='off' ? 'Commentary OFF' : commentaryMode==='audio' ? 'Audio Commentary' : 'Text Commentary';
+}
+function hideCommentaryText(){
+  cmTimer=0;
+  const box=document.getElementById('commentary');
+  if(box) box.style.opacity='0';
+}
+function cycleCommentaryMode(){
+  if(commentaryMode==='text') commentaryMode='audio';
+  else if(commentaryMode==='audio') commentaryMode='off';
+  else commentaryMode='text';
+  if(commentaryMode==='off'){
+    window.speechSynthesis?.cancel();
+    hideCommentaryText();
+  }
+  if(commentaryMode==='audio') hideCommentaryText();
+  updateCommentaryButton();
+  toast(`Commentary ${commentaryMode.toUpperCase()}`);
+}
 function trigCM(type,custom){
+  if(commentaryMode==='off'){
+    hideCommentaryText();
+    return;
+  }
   const lines=custom?[custom]:(CM[type]||[]);
   if(!lines.length)return;
-  document.getElementById('cmtxt').textContent=pick(lines);
-  document.getElementById('commentary').style.opacity='1';
-  cmTimer=280;
+  const line=pick(lines);
+  if(commentaryMode==='audio'){
+    speakCommentary(line);
+    hideCommentaryText();
+  } else {
+    document.getElementById('cmtxt').textContent=line;
+    document.getElementById('commentary').style.opacity='1';
+    cmTimer=120;
+  }
 }
 function tickCM(){
-  if(cmTimer<=0)return;cmTimer--;
-  if(cmTimer<60)document.getElementById('commentary').style.opacity=cmTimer/60;
+  if(commentaryMode!=='text'){
+    hideCommentaryText();
+    return;
+  }
+  if(cmTimer<=0) return;
+  cmTimer--;
+  if(cmTimer<60) document.getElementById('commentary').style.opacity=cmTimer/60;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -634,17 +697,25 @@ let selTeam=0;
 let oppTeam=1;
 let selectingOpponent=false;
 let gMode='single';
+let netRole=null;
+const netTeams={host:null,guest:null};
+let netMatchStarted=false;
 
 function goTeamSel(mode){
   gMode=mode;
   selectingOpponent=false;
-oppTeam=1;
-
-document.querySelector(".scr-title").textContent="CHOOSE YOUR TEAM";
-document.querySelector(".scr-sub").textContent="SELECT YOUR SQUAD";
+  oppTeam=1;
+  if(mode==='network'){
+    document.querySelector(".scr-title").textContent="CHOOSE YOUR TEAM";
+    document.querySelector(".scr-sub").textContent="SELECT YOUR SQUAD FOR THE MATCH";
+    document.getElementById('btnKO').textContent='⚽ CONTINUE';
+  } else {
+    document.querySelector(".scr-title").textContent="CHOOSE YOUR TEAM";
+    document.querySelector(".scr-sub").textContent="SELECT YOUR SQUAD";
+    document.getElementById('btnKO').textContent=mode==='tournament'?'🏆 START TOURNAMENT':'⚽ KICK OFF';
+  }
   SFX.select();buildTeamGrid();
-  document.getElementById("btnKO").disabled=true;
-  document.getElementById('btnKO').textContent=mode==='tournament'?'🏆 START TOURNAMENT':'⚽ KICK OFF';
+  document.getElementById("btnKO").disabled=(mode==='network'&&selTeam===null);
   showScr('teamScreen');
 }
 function buildTeamGrid(){
@@ -677,6 +748,13 @@ function buildTeamGrid(){
             return;
         }
 
+        if(gMode === 'network'){
+            selTeam=i;
+            document.getElementById("btnKO").disabled=false;
+            buildTeamGrid();
+            return;
+        }
+
         if(!selectingOpponent){
             selTeam=i;
             selectingOpponent=true;
@@ -693,11 +771,6 @@ function buildTeamGrid(){
             return;
         }
 
-        if(i===selTeam){
-            toast("Choose another team.");
-            return;
-        }
-
         oppTeam=i;
         document.getElementById("btnKO").disabled=false;
         buildTeamGrid();
@@ -710,13 +783,15 @@ function buildTeamGrid(){
 function startFromTeamSel(){
   SFX.select();
 
-  if(gMode==='tournament'){
-      initTrn();
+  if(gMode==='network'){
+      if(netRole==='host') netTeams.host=selTeam;
+      else netTeams.guest=selTeam;
+      showSig(netRole);
       return;
   }
 
-  if(gMode !== 'training' && selTeam===oppTeam){
-      toast("Choose a different opponent.");
+  if(gMode==='tournament'){
+      initTrn();
       return;
   }
 
@@ -747,88 +822,130 @@ function launchSingle(){isMulti=false;isHost=true;beginMatch();}
 function initTrn(){
   const pool=TEAMS.map((_,i)=>i).filter(i=>i!==selTeam);
   for(let i=pool.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
-  // slots: 0=player,1=ai1 | 2=ai2,3=ai3
-  const s2=simMatch();
+  const slots=[selTeam,...pool.slice(0,7)];
   trn={
-    slots:[selTeam,pool[0],pool[1],pool[2]],
-    s1r:null,s1sc:[null,null],
-    s2r:s2.w===0?2:3,s2sc:s2.sc,
-    fr:null,fsc:[null,null],
-    round:'semi',elim:false,
+    slots,
+    matches:[
+      {a:0,b:1,sc:[null,null],win:null},
+      {a:2,b:3,sc:[null,null],win:null},
+      {a:4,b:5,sc:[null,null],win:null},
+      {a:6,b:7,sc:[null,null],win:null},
+      {a:'w0',b:'w1',sc:[null,null],win:null},
+      {a:'w2',b:'w3',sc:[null,null],win:null},
+      {a:'w4',b:'w5',sc:[null,null],win:null},
+    ],
+    results:[],
+    round:'quarter',
+    matchIndex:0,
+    champion:null,
+    elim:false,
   };
   showTrn();
 }
-function simMatch(){
-  let a=Math.floor(rnd()*4),b=Math.floor(rnd()*4);
-  while(a===b)b=Math.floor(rnd()*4);
-  return{sc:[a,b],w:a>b?0:1};
-}
 function showTrn(){renderBracket();showScr('tournamentScreen');}
 
+function resolveSlot(ref){
+  if(typeof ref==='number') return ref;
+  if(typeof ref==='string'&&ref.startsWith('w')){
+    const idx=parseInt(ref.slice(1),10);const res=trn.results[idx];
+    return res? (res.win===0?res.a:res.b) : null;
+  }
+  return null;
+}
+function slotLabel(ref){
+  const idx=resolveSlot(ref);
+  return idx===null?'?':TEAMS[trn.slots[idx]].name;
+}
+function slotColor(ref){
+  const idx=resolveSlot(ref);
+  return idx===null?'#555':TEAMS[trn.slots[idx]].c;
+}
+function roundLabel(){
+  if(trn.round==='quarter')return 'ROUND OF 8';
+  if(trn.round==='semi')return 'SEMI-FINALS';
+  if(trn.round==='final')return 'THE FINAL';
+  return 'CHAMPIONS';
+}
 function renderBracket(){
-  const T=trn,sl=T.slots;
-  const tn=i=>TEAMS[sl[i]].name,tc=i=>TEAMS[sl[i]].c;
-  document.getElementById('trnLbl').textContent=T.round==='champion'?'🏆 CHAMPIONS!':T.round==='final'?'THE FINAL':'SEMI-FINALS';
+  const T=trn;
+  document.getElementById('trnLbl').textContent=roundLabel();
   const btn=document.getElementById('btnNxt');
   btn.style.display=T.round==='champion'?'none':'flex';
-  btn.textContent=T.round==='final'?'▶ PLAY THE FINAL':'▶ PLAY YOUR SEMI-FINAL';
+  btn.textContent=T.round==='quarter'?'▶ PLAY QUARTER FINAL':T.round==='semi'?'▶ PLAY SEMI-FINAL':'▶ PLAY THE FINAL';
 
-  const f1n=T.s1r!==null?(T.s1r===0?tn(0):tn(1)):'?';
-  const f1c=T.s1r!==null?(T.s1r===0?tc(0):tc(1)):'#555';
-  const f2n=T.s2r!==null?(T.s2r===2?tn(2):tn(3)):'?';
-  const f2c=T.s2r!==null?(T.s2r===2?tc(2):tc(3)):'#555';
-
-  function bm(lbl,n1,c1,n2,c2,sc,w1,w2,live){
+  function bm(lbl,a,b,sc,winA,winB,live){
+    const n1=slotLabel(a),n2=slotLabel(b),c1=slotColor(a),c2=slotColor(b);
     const sv=sc[0]!==null?`<span style="font-weight:700;color:var(--accent)">${sc[0]}–${sc[1]}</span>`:`<span style="color:var(--muted)">vs</span>`;
-    return`<div class="bm${live?' live':''}">
+    return `<div class="bm${live?' live':''}">
       <div class="bm-lbl">${lbl}</div>
-      <div class="bm-t${w1?' w':''}${w2?' l':''}"><div class="bm-d" style="background:${c1}"></div>${n1}</div>
+      <div class="bm-t${winA?' w':''}${winB?' l':''}"><div class="bm-d" style="background:${c1}"></div>${n1}</div>
       <div class="bm-vs">${sv}</div>
-      <div class="bm-t${w2?' w':''}${w1?' l':''}"><div class="bm-d" style="background:${c2}"></div>${n2}</div>
+      <div class="bm-t${winB?' w':''}${winA?' l':''}"><div class="bm-d" style="background:${c2}"></div>${n2}</div>
     </div>`;
   }
 
+  const q0=trn.matches[0],q1=trn.matches[1],q2=trn.matches[2],q3=trn.matches[3];
+  const s0=trn.matches[4],s1=trn.matches[5],f0=trn.matches[6];
   document.getElementById('bracketWrap').innerHTML=
-    bm('SEMI-FINAL 1',tn(0),tc(0),tn(1),tc(1),T.s1sc,T.s1r===0,T.s1r===1,T.round==='semi'&&T.s1r===null)+
+    bm('QUARTER 1',q0.a,q0.b,q0.sc,q0.win===0,q0.win===1,T.round==='quarter'&&trn.matchIndex===0)+
     `<div class="barr">→</div>`+
-    bm('FINAL',f1n,f1c,f2n,f2c,T.fsc,T.fr===0,T.fr===1,T.round==='final'&&T.fr===null)+
+    bm('QUARTER 2',q1.a,q1.b,q1.sc,q1.win===0,q1.win===1,T.round==='quarter'&&trn.matchIndex===1)+
     `<div class="barr">→</div>`+
-    bm('SEMI-FINAL 2',tn(2),tc(2),tn(3),tc(3),T.s2sc,T.s2r===2,T.s2r===3,false);
+    bm('QUARTER 3',q2.a,q2.b,q2.sc,q2.win===0,q2.win===1,T.round==='quarter'&&trn.matchIndex===2)+
+    `<div class="barr">→</div>`+
+    bm('QUARTER 4',q3.a,q3.b,q3.sc,q3.win===0,q3.win===1,T.round==='quarter'&&trn.matchIndex===3)+
+    `<div class="barr">→</div>`+
+    bm('SEMI 1',s0.a,s0.b,s0.sc,s0.win===0,s0.win===1,T.round==='semi'&&trn.matchIndex===0)+
+    `<div class="barr">→</div>`+
+    bm('SEMI 2',s1.a,s1.b,s1.sc,s1.win===0,s1.win===1,T.round==='semi'&&trn.matchIndex===1)+
+    `<div class="barr">→</div>`+
+    bm('FINAL',f0.a,f0.b,f0.sc,f0.win===0,f0.win===1,T.round==='final'&&trn.matchIndex===0);
 
-  if(T.round==='champion'){
+  if(T.round==='champion'&&T.champion!==null){
     document.getElementById('bracketWrap').insertAdjacentHTML('afterend',
-      `<div style="font-family:'Russo One',sans-serif;font-size:clamp(16px,4vw,26px);color:var(--accent);letter-spacing:3px;text-align:center;margin-top:10px">🏆 ${TEAMS[selTeam].name} 🏆</div>`);
+      `<div style="font-family:'Russo One',sans-serif;font-size:clamp(16px,4vw,26px);color:var(--accent);letter-spacing:3px;text-align:center;margin-top:10px">🏆 ${TEAMS[T.champion].name} 🏆</div>`);
   }
 }
 
 function startTrnMatch(){
-  SFX.select();const T=trn,sl=T.slots;
-  if(T.round==='semi'){applyTeams(sl[0],sl[1]);launchSingle();}
-  else if(T.round==='final'){const opp=T.s2r===2?sl[2]:sl[3];applyTeams(sl[0],opp);launchSingle();}
+  SFX.select();
+  const match=trn.matches[trn.matchIndex];
+  const a=resolveSlot(match.a);
+  const b=resolveSlot(match.b);
+  if(a===null||b===null){toast('Waiting for tournament slots...');return;}
+  applyTeams(trn.slots[a],trn.slots[b]);
+  launchSingle();
 }
 function onTrnEnd(){
-  const T=trn,won=score[0]>score[1];
-  if(T.round==='semi'){
-    T.s1r=won?0:1;T.s1sc=[score[0],score[1]];
-    if(won){
-      T.round='final';SFX.advance();
-      setTMsg('🟢 THROUGH TO THE FINAL!','var(--ok)');
-      document.getElementById('btnEA').textContent='▶ TO THE FINAL';
-    }else{
-      T.elim=true;setTMsg('💔 ELIMINATED IN THE SEMI','var(--danger)');
-      document.getElementById('btnEA').textContent='← MAIN MENU';
+  const match=trn.matches[trn.matchIndex];
+  const won=score[0]>score[1];
+  match.sc=[score[0],score[1]];
+  match.win=won?0:1;
+  trn.results[trn.matchIndex]=match;
+  const playerSlot = trn.slots[selTeam]!==undefined; // placeholder
+  const isPlayerMatch = [0,1,2,3,4,5,6].includes(trn.matchIndex) && (resolveSlot(match.a)===selTeam||resolveSlot(match.b)===selTeam);
+
+  if(!won && isPlayerMatch){
+    trn.elim=true;
+  }
+
+  if(trn.round==='quarter'){
+    trn.matchIndex++;
+    if(trn.matchIndex>=4){
+      trn.round='semi';trn.matchIndex=4;SFX.advance();
+      if(!trn.elim){setTMsg('🟢 THROUGH TO THE SEMI-FINALS!','var(--ok)');document.getElementById('btnEA').textContent='▶ TO THE SEMI';}
     }
-  }else if(T.round==='final'){
-    T.fr=won?0:1;T.fsc=[score[0],score[1]];
-    if(won){
-      T.round='champion';SFX.champion();trigCM('champ');
-      document.getElementById('endTitle').textContent='🏆 CHAMPIONS!';
-      setTMsg('🏆 TOURNAMENT WINNERS! 🏆','var(--accent)');
-      document.getElementById('btnEA').textContent='🏆 SEE BRACKET';
-    }else{
-      T.elim=true;setTMsg('🥈 RUNNERS-UP — WELL PLAYED','#aaa');
-      document.getElementById('btnEA').textContent='← MAIN MENU';
+  } else if(trn.round==='semi'){
+    trn.matchIndex++;
+    if(trn.matchIndex>=6){
+      trn.round='final';trn.matchIndex=6;SFX.advance();
+      if(!trn.elim){setTMsg('🟢 THROUGH TO THE FINAL!','var(--ok)');document.getElementById('btnEA').textContent='▶ TO THE FINAL';}
     }
+  } else if(trn.round==='final'){
+    trn.champion=resolveSlot(match.win===0?match.a:match.b);
+    trn.round='champion';
+    if(!trn.elim){SFX.champion();trigCM('champ');document.getElementById('endTitle').textContent='🏆 CHAMPIONS!';setTMsg('🏆 TOURNAMENT WINNERS! 🏆','var(--accent)');document.getElementById('btnEA').textContent='🏆 SEE BRACKET';}
+    else {setTMsg('🥈 RUNNERS-UP — WELL PLAYED','#aaa');document.getElementById('btnEA').textContent='← MAIN MENU';}
   }
 }
 function setTMsg(msg,color){
@@ -846,10 +963,28 @@ function endAct(){
 // ═══════════════════════════════════════════════════════
 // TEAM SETUP
 // ═══════════════════════════════════════════════════════
+function hexToRgb(hex){
+  const h=hex.replace('#','');
+  return {r:parseInt(h.slice(0,2),16),g:parseInt(h.slice(2,4),16),b:parseInt(h.slice(4,6),16)};
+}
+function rgbToHex(r,g,b){
+  const to=(v)=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0');
+  return `#${to(r)}${to(g)}${to(b)}`;
+}
+function shadeColor(hex,amt){
+  const c=hexToRgb(hex);return rgbToHex(c.r+amt,c.g+amt,c.b+amt);
+}
+
 function applyTeams(i1,i2){
   const t1=TEAMS[i1],t2=TEAMS[i2];
-  CFG.t1c=t1.c;CFG.t1gk=t1.gk;CFG.t1dk=t1.dk;CFG.t1nm=t1.name; CFG.t1st=t1.st;
-  CFG.t2c=t2.c;CFG.t2gk=t2.gk;CFG.t2dk=t2.dk;CFG.t2nm=t2.name; CFG.t2st=t2.st;
+  CFG.t1c=t1.c;CFG.t1gk=t1.gk;CFG.t1dk=t1.dk;CFG.t1nm=t1.name;CFG.t1st=t1.st;
+  CFG.t2st=t2.st;
+  if(i1===i2){
+    CFG.t2c=shadeColor(t2.c,22);CFG.t2gk=shadeColor(t2.gk,14);CFG.t2dk=shadeColor(t2.dk,-20);
+    CFG.t2nm=`${t2.name} II`;
+  } else {
+    CFG.t2c=t2.c;CFG.t2gk=t2.gk;CFG.t2dk=t2.dk;CFG.t2nm=t2.name;
+  }
 }
 
 function createTeams(rst=true){
@@ -1798,7 +1933,7 @@ function drawHUD(){
 
   // Net indicator
   if(isMulti){
-    const ok=dchan&&dchan.readyState==='open';
+    const ok=(inputChan?.readyState==='open'||eventChan?.readyState==='open');
     cx.fillStyle='rgba(10,15,26,.75)';cx.beginPath();rRect(cx,W-92,8,84,22,5);cx.fill();
     cx.fillStyle=ok?'#06D6A0':'#E63946';cx.beginPath();cx.arc(W-82,19,4,0,Math.PI*2);cx.fill();
     cx.font='500 10px "Space Grotesk"';cx.textAlign='left';cx.fillStyle=ok?'#06D6A0':'#E63946';cx.fillText(ok?'LIVE':'OFFLINE',W-74,19);
@@ -1854,40 +1989,44 @@ function waitICE(p2){
   });
 }
 function setupInputDC(ch){
-
     ch.onopen=()=>{
         if(eventChan?.readyState==="open"){
             connected();
         }
     };
-
     ch.onmessage=e=>{
         onInput(JSON.parse(e.data));
     };
-
     ch.onclose=disconnect;
-
 }
-
 function setupEventDC(ch){
-
     ch.onopen=()=>{
         if(inputChan?.readyState==="open"){
             connected();
         }
+        sendTeamSelection();
     };
-
     ch.onmessage=e=>{
         onEvent(JSON.parse(e.data));
     };
-
     ch.onclose=disconnect;
-
 }
-
+function sendTeamSelection(){
+  if(!netRole||netTeams[netRole]===null)return;
+  sendEvent({t:'team',role:netRole,team:netTeams[netRole]});
+}
+function tryNetStart(){
+  if(netMatchStarted)return;
+  if(!inputChan||inputChan.readyState!=='open')return;
+  if(!eventChan||eventChan.readyState!=='open')return;
+  if(netTeams.host===null||netTeams.guest===null)return;
+  netMatchStarted=true;
+  setSt('conn','Teams ready. Starting...');
+  setTimeout(beginMatch,400);
+}
 function connected(){
-    setSt("conn","Connected! Starting...");
-    setTimeout(beginMatch,800);
+    setSt('conn','Connected! Waiting for team sync...');
+    setTimeout(tryNetStart,400);
 }
 
 function disconnect(){
@@ -1896,8 +2035,20 @@ function disconnect(){
         gs="ended";
     }
 }
+function prepareNetMatch(mode){
+  netRole=mode;
+  gMode='network';
+  selectingOpponent=false;
+  selTeam = mode==='host' ? (netTeams.host!==null?netTeams.host:0) : (netTeams.guest!==null?netTeams.guest:1);
+  document.querySelector('.scr-title').textContent='CHOOSE YOUR TEAM';
+  document.querySelector('.scr-sub').textContent=mode==='host'?'SELECT HOST TEAM':'SELECT YOUR JOIN TEAM';
+  document.getElementById('btnKO').textContent='⚽ CONTINUE';
+  document.getElementById('btnKO').disabled=false;
+  buildTeamGrid();
+  showScr('teamScreen');
+}
 function showSig(mode){
-  isMulti=true;hideScr('menuScreen');showScr('signalScreen');
+  isMulti=true;netRole=mode;hideScr('menuScreen');showScr('signalScreen');
   document.getElementById('stepAns').style.display='none';
   document.getElementById('sigSt').className='sig-st';
   const btn=document.getElementById('btnSigAct');
@@ -1966,20 +2117,26 @@ async function guestAns(){
   }catch(e){setSt('err','Failed: '+e.message);}
 }
 function setSt(c,m){const el=document.getElementById('sigSt');el.className='sig-st '+c;el.textContent=m;}
+function sndNet(data){
+    if(isHost){
+        if(eventChan?.readyState==='open'){
+            eventChan.send(JSON.stringify(data));
+        }
+    } else {
+        if(inputChan?.readyState==='open'){
+            inputChan.send(JSON.stringify(data));
+        }
+    }
+}
 function sendInput(data){
-
-    if(inputChan?.readyState==="open"){
+    if(inputChan?.readyState===true||inputChan?.readyState==='open'){
         inputChan.send(JSON.stringify(data));
     }
-
 }
-
 function sendEvent(data){
-
-    if(eventChan?.readyState==="open"){
+    if(eventChan?.readyState===true||eventChan?.readyState==='open'){
         eventChan.send(JSON.stringify(data));
     }
-
 }
 function onInput(d){
 
@@ -1994,22 +2151,19 @@ function onInput(d){
 }
 
 function onEvent(d){
-
-    if(d.t==='s'&&!isHost){
-
-    if(d.seq<=lastSnapshot)
+    if(d.t==='team'){
+        if(d.role==='host') netTeams.host=d.team;
+        if(d.role==='guest') netTeams.guest=d.team;
+        tryNetStart();
         return;
-
-    lastSnapshot=d.seq;
-
-    snapBuffer.push(d);
-
-    if(snapBuffer.length>20)
-        snapBuffer.shift();
-
-    return;
     }
-
+    if(d.t==='s'&&!isHost){
+        if(d.seq<=lastSnapshot) return;
+        lastSnapshot=d.seq;
+        snapBuffer.push(d);
+        if(snapBuffer.length>20) snapBuffer.shift();
+        return;
+    }
 }
 function serSt(){
   return{
@@ -2072,16 +2226,6 @@ createTeams();gs='kickoff';koTimer=90;
 document.getElementById('exitBtn').classList.add('vis');
   requestAnimationFrame(gameLoop);
 }
-function backMenu(){
-  gs='menu';trn=null;if(peer){peer.close();peer=null;dchan=null;}
-  ['signalScreen','endScreen','teamScreen','tournamentScreen'].forEach(hideScr);
-  document.getElementById('mainMenuTrayToggle').style.display = 'flex';
-document.getElementById('trainingTrayToggle').style.display = 'none';
-toggleConfigTray(false); // Collapses panel automatically out of viewport bounds
-showScr('menuScreen');document.getElementById('sndBtn').classList.remove('vis');
-document.getElementById('exitBtn').classList.add('vis');
-  applyTeams(0,1);createTeams();render();
-}
 function showEnd(){
   showScr('endScreen');
   document.getElementById('endTitle').textContent='FULL TIME';
@@ -2101,6 +2245,17 @@ function showEnd(){
   document.getElementById('btnEA').textContent=trn?'▶ CONTINUE':'▶ PLAY AGAIN';
   SFX.fulltime();trigCM('full');
   if(trn)onTrnEnd();
+}
+function backMenu(){
+  gs='menu';trn=null;netRole=null;netMatchStarted=false;netTeams.host=null;netTeams.guest=null;
+  if(peer){peer.close();peer=null;inputChan=null;eventChan=null;}
+  ['signalScreen','endScreen','teamScreen','tournamentScreen'].forEach(hideScr);
+  document.getElementById('mainMenuTrayToggle').style.display = 'flex';
+  document.getElementById('trainingTrayToggle').style.display = 'none';
+  toggleConfigTray(false);
+  showScr('menuScreen');document.getElementById('sndBtn').classList.remove('vis');
+  document.getElementById('exitBtn').classList.add('vis');
+  applyTeams(0,1);createTeams();render();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2518,7 +2673,7 @@ function selectTrnType(type) {
 // ═══════════════════════════════════════════════════════
 function init(){
   showScr('menuScreen');['signalScreen','endScreen','teamScreen','tournamentScreen'].forEach(hideScr);
-  applyTeams(0,1);createTeams();render();gs='menu';initMobile();
+  applyTeams(0,1);createTeams();render();gs='menu';initMobile();updateCommentaryButton();
 }
 const fsBtn = document.getElementById("fsBtn");
 const exitBtn=document.getElementById("exitBtn");
