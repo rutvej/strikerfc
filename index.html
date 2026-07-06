@@ -261,9 +261,16 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
     position: absolute;
     display: none;
     opacity: 0;
-    pointer-events: none;
+    pointer-events: auto;
     touch-action: none;
     transition: opacity 0.15s ease-out;
+}
+
+#mOvl .aPne,
+#mOvl .mb,
+#mOvl #jZone,
+#mOvl #ptLbl {
+    pointer-events: auto;
 }
 
 .aPne {
@@ -285,6 +292,11 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
 @media(max-width:1024px){
   #mOvl{display:block!important} /* Assures interface overlays remain drawn when tweaking values */
   .btn{min-width:200px;padding:11px 20px;font-size:13px}
+  #topConfigTray{max-height:calc(100vh - 16px)}
+  #topConfigTray .btn{min-width:auto}
+  #mOvl{pointer-events:none}
+  #jZone{touch-action:none}
+  .aPne{touch-action:none}
 }
 
 /* Rotate overlay */
@@ -350,6 +362,7 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
         <h3 style="color: #fff; font-family: 'Russo One'; font-size: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">🎧 AUDIO & COMMENTARY</h3>
         <div style="display: flex; flex-direction: column; gap: 12px;">
           <button class="btn btn-sm" id="cfgCommentaryBtn" onclick="cycleCommentaryMode(); updateCommentarySettings();">COMMENTARY: TEXT</button>
+          <button class="btn btn-sm" id="cfgMusicBtn" onclick="toggleMusic();">MUSIC: ON</button>
           <button class="btn btn-sm" id="cfgCrowdBtn" onclick="toggleCrowdNoise();">CROWD NOISE: ON</button>
           <div>
             <label style="display: flex; justify-content: space-between; font-size: 11px; color: var(--muted);">STADIUM ENERGY <span id="crowdVolLbl">50%</span></label>
@@ -538,7 +551,7 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
 <div id="pauseOverlay" style="display:none; position:fixed; inset:0; background:rgba(10,15,26,0.85); backdrop-filter:blur(8px); z-index:1000; flex-direction:column; align-items:center; justify-content:center; gap:20px;">
   <div style="font-family:'Russo One',sans-serif; font-size:48px; color:var(--accent); letter-spacing:4px; text-shadow:0 0 20px rgba(244,162,97,0.3);">PAUSED</div>
   <button class="btn btn-p" onclick="togglePause(false)">▶ RESUME</button>
-  <button class="btn" onclick="backMenu(); togglePause(false);">🏠 EXIT TO MENU</button>
+  <button class="btn" onclick="backMenu()">🏠 EXIT TO MENU</button>
 </div>
 
 <canvas id="gameCanvas"></canvas>
@@ -678,7 +691,7 @@ const BGM = {
     this._ctx = SFX.c;
   },
   start() {
-    if (this.playing) return;
+    if (this.playing || !this.on || !SFX.on || gs === 'menu' || isPaused) return;
     this.init();
     if (!this._ctx) return;
     this.playing = true;
@@ -733,18 +746,32 @@ const BGM = {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
+  },
+  setEnabled(enabled) {
+    this.on = enabled;
+    localStorage.setItem('musicEnabled', enabled ? '1' : '0');
+    if (!enabled) {
+      this.stop();
+    } else {
+      updateMusicSettings();
+      if (!isPaused && SFX.on && gs !== 'menu') this.start();
+    }
   }
 };
 
 document.getElementById('sndBtn').onclick=()=>{
   SFX.on=!SFX.on;
   document.getElementById('sndBtn').textContent=SFX.on?'🔊':'🔇';
-  if(SFX.on) { BGM.start(); } else { BGM.stop(); }
+  if(SFX.on) {
+    if (BGM.on && gs !== 'menu' && !isPaused) BGM.start();
+  } else {
+    BGM.stop();
+  }
 };
 document.getElementById('cmBtn').onclick=cycleCommentaryMode;
 
 const CrowdNoise={
-  _src:null,_gain:null,
+  _src:null,_gain:null,_bed:null,_chant:null,
   on:true,
   vol:.5,
   init(){
@@ -752,15 +779,65 @@ const CrowdNoise={
     if(this._src) return;
     try{
       const sr=c.sampleRate;
-      const buf=c.createBuffer(1,sr*2,sr);
-      const data=buf.getChannelData(0);
-      for(let i=0;i<data.length;i++) data[i]=(Math.random()*2-1)*Math.pow(1-i/data.length,1.5);
-      const src=c.createBufferSource();
-      src.buffer=buf;src.loop=true;
-      const gain=c.createGain();gain.gain.value=this.on?this.vol:0;
-      src.connect(gain);gain.connect(c.destination);
-      src.start(0);
-      this._src=src;this._gain=gain;
+      const mixer=c.createGain();
+      const crowdGain=c.createGain();
+      const bedGain=c.createGain();
+      const chantGain=c.createGain();
+      const noiseBuf=c.createBuffer(1,sr*3,sr);
+      const noiseData=noiseBuf.getChannelData(0);
+      for(let i=0;i<noiseData.length;i++){
+        const fade=Math.pow(1-i/noiseData.length,1.35);
+        noiseData[i]=(Math.random()*2-1)*fade;
+      }
+      const noise=c.createBufferSource();
+      noise.buffer=noiseBuf;
+      noise.loop=true;
+      const crowdFilter=c.createBiquadFilter();
+      crowdFilter.type='bandpass';
+      crowdFilter.frequency.value=920;
+      crowdFilter.Q.value=0.7;
+      const crowdGain2=c.createGain();
+      crowdGain2.gain.value=0.55;
+
+      const bedOsc=c.createOscillator();
+      const bedFilter=c.createBiquadFilter();
+      bedOsc.type='sine';
+      bedOsc.frequency.value=52;
+      bedFilter.type='lowpass';
+      bedFilter.frequency.value=130;
+      bedGain.gain.value=0.08;
+
+      const chantOsc=c.createOscillator();
+      const chantGain2=c.createGain();
+      chantOsc.type='triangle';
+      chantOsc.frequency.value=2.8;
+      chantGain2.gain.value=0.02;
+
+      noise.connect(crowdFilter);
+      crowdFilter.connect(crowdGain2);
+      crowdGain2.connect(crowdGain);
+      bedOsc.connect(bedFilter);
+      bedFilter.connect(bedGain);
+      chantOsc.connect(chantGain2);
+      chantGain2.connect(chantGain);
+      crowdGain.connect(mixer);
+      bedGain.connect(mixer);
+      chantGain.connect(mixer);
+      mixer.connect(c.destination);
+
+      const base = this.on ? this.vol : 0;
+      mixer.gain.value = base;
+      crowdGain.gain.value = base * 0.9;
+      bedGain.gain.value = base * 0.18;
+      chantGain.gain.value = base * 0.22;
+
+      noise.start();
+      bedOsc.start();
+      chantOsc.start();
+      this._src=noise;
+      this._gain=mixer;
+      this._bed=bedOsc;
+      this._chant=chantOsc;
     }catch(e){}
   },
   toggle(){
@@ -942,6 +1019,15 @@ function updateCrowdSettings(){
   if(btn) btn.textContent = `CROWD NOISE: ${CrowdNoise.on ? 'ON' : 'OFF'}`;
   if(lbl) lbl.textContent = `${Math.round(CrowdNoise.vol*100)}%`;
 }
+function updateMusicSettings() {
+  const btn = document.getElementById('cfgMusicBtn');
+  if (btn) btn.textContent = `MUSIC: ${BGM.on ? 'ON' : 'OFF'}`;
+}
+function toggleMusic() {
+  BGM.setEnabled(!BGM.on);
+  updateMusicSettings();
+  toast(`Music ${BGM.on ? 'ON' : 'OFF'}`);
+}
 function hideCommentaryText(){
   cmTimer=0;
   const box=document.getElementById('commentary');
@@ -1058,9 +1144,18 @@ const cv=document.getElementById('gameCanvas');
 const cx=cv.getContext('2d');
 cv.width=W;cv.height=H;
 
+function shouldCoverViewport() {
+  return window.innerWidth < 1024 && controlMode === 'gestures';
+}
+
 function resizeCv(){
   const r=W/H;let w=window.innerWidth,h=window.innerHeight;
-  if(w/h>r)w=h*r;else h=w/r;
+  if (shouldCoverViewport()) {
+    if (w / h > r) h = w / r;
+    else w = h * r;
+  } else {
+    if(w/h>r)w=h*r;else h=w/r;
+  }
   cv.style.cssText=`position:fixed;width:${w}px;height:${h}px;left:${(window.innerWidth-w)/2}px;top:${(window.innerHeight-h)/2}px`;
 }
 window.addEventListener('resize',()=>{resizeCv();checkOri()});
@@ -1089,6 +1184,7 @@ function goTeamSel(mode){
   gMode=mode;
   selectingOpponent=false;
   oppTeam=1;
+  history.pushState({view:'team'}, '', window.location.pathname);
   if(mode==='network'){
     document.querySelector(".scr-title").textContent="CHOOSE YOUR TEAM";
     document.querySelector(".scr-sub").textContent="SELECT YOUR SQUAD FOR THE MATCH";
@@ -1226,7 +1322,7 @@ function initTrn(){
   };
   showTrn();
 }
-function showTrn(){renderBracket();showScr('tournamentScreen');}
+function showTrn(){history.pushState({view:'tournament'}, '', window.location.pathname); renderBracket(); showScr('tournamentScreen');}
 
 function resolveSlot(ref){
   if(typeof ref==='number') return ref;
@@ -2477,6 +2573,7 @@ function copyInviteLink() {
 
 function showSig(mode){
   isMulti=true;netRole=mode;hideScr('menuScreen');showScr('signalScreen');
+  history.pushState({view:'signal'}, '', window.location.pathname);
   document.getElementById('sigSt').className='sig-st';
   const btn=document.getElementById('btnSigAct');
   
@@ -2613,7 +2710,7 @@ function serSt(){
 // GAME FLOW
 // ═══════════════════════════════════════════════════════
 let isPaused = false;
-function togglePause(p) {
+function togglePause(p, resumeMusic = true) {
   SFX.select();
   isPaused = p;
   const overlay = document.getElementById('pauseOverlay');
@@ -2627,7 +2724,13 @@ function togglePause(p) {
   if(isPaused) {
     BGM.stop();
   } else {
-    if(SFX.on) BGM.start();
+    if(resumeMusic && SFX.on && BGM.on && gs !== 'menu') BGM.start();
+  }
+}
+
+function startMatchAudio() {
+  if (SFX.on && BGM.on && !isPaused && gs !== 'menu') {
+    BGM.start();
   }
 }
 
@@ -2657,6 +2760,8 @@ function beginMatch(){
   document.getElementById('exitBtn').classList.add('vis');
   document.getElementById('pauseBtn').classList.add('vis');
   togglePause(false);
+  history.pushState({view:'match'}, '', window.location.pathname);
+  startMatchAudio();
   requestAnimationFrame(gameLoop);
 }
 
@@ -2671,6 +2776,7 @@ function showEnd(){
   
   document.getElementById('pauseBtn').classList.remove('vis');
   togglePause(false);
+  BGM.stop();
   
   let lbl='Draw!';
   if(score[0]>score[1])lbl=isMulti?(isHost?'You Win!':'You Lose!'):`${CFG.t1nm} Win!`;
@@ -2700,8 +2806,10 @@ function backMenu(){
   document.getElementById('sndBtn').classList.remove('vis');
   document.getElementById('exitBtn').classList.remove('vis');
   document.getElementById('pauseBtn').classList.remove('vis');
-  togglePause(false);
+  togglePause(false, false);
+  BGM.stop();
   applyTeams(0,1);createTeams();render();
+  history.replaceState({}, document.title, window.location.pathname);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3211,6 +3319,7 @@ function showTraining() {
   SFX.select();
   const menu = document.getElementById('menuScreen');
   menu.classList.add('hidden');
+  history.pushState({view:'training'}, '', window.location.pathname);
   
   // Re-use Team Selection Screen with modified styling/instructions
   const scrTitle = document.querySelector(".scr-title");
@@ -3289,6 +3398,8 @@ function init(){
   applyTeams(0,1);createTeams();render();gs='menu';initMobile();
   updateCommentaryButton();
   updateCommentarySettings();
+  BGM.on = localStorage.getItem('musicEnabled') !== '0';
+  updateMusicSettings();
   updateCrowdSettings();
   
   // Load control mode from settings or localStorage
@@ -3337,6 +3448,12 @@ fsBtn.addEventListener("click", async () => {
 document.addEventListener("fullscreenchange",()=>{
     fsBtn.textContent =
         document.fullscreenElement ? "🡽" : "⛶";
+});
+
+window.addEventListener('popstate', () => {
+  if (gs !== 'menu' || !document.getElementById('menuScreen').classList.contains('hidden')) {
+    backMenu();
+  }
 });
   // ═══════════════════════════════════════════════════════
 // PWA INSTALLATION & AI DIFFICULTY SYSTEMS
@@ -3518,6 +3635,7 @@ function switchControlMode(mode) {
       joystickZone.style.pointerEvents = 'none';
     }
   }
+  resizeCv();
 }
 
 function restoreEngineSystemDefaults() {
