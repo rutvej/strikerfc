@@ -30,6 +30,26 @@
 #exitBtn.vis{
     display:flex;
 }
+#pauseBtn{
+    position:fixed;
+    top:12px;
+    right:188px;
+    z-index:300;
+    width:34px;
+    height:34px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    background:rgba(17,24,39,.88);
+    color:var(--fg);
+    cursor:pointer;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    font-size:15px;
+}
+#pauseBtn.vis{
+    display:flex;
+}
 #cmBtn{
     position:fixed;
     top:12px;
@@ -382,6 +402,7 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
 <button id="trainingTrayToggle" style="position: fixed; top: 12px; left: 56px; z-index: 300; width: 34px; height: 34px; border-radius: 8px; border: 1px solid #06D6A0; background: rgba(10,21,16,.88); color: #06D6A0; cursor: pointer; display: none; align-items: center; justify-content: center; font-size: 15px;" onclick="toggleConfigTray(true)">🧪⚙️</button>
 
     <button id="exitBtn" title="Exit Match">🏠</button>
+    <button id="pauseBtn" title="Pause Match">⏸</button>
 <button id="cmBtn" title="Commentary Mode">🎙️</button>
 <button id="fsBtn" title="Fullscreen">⛶</button>
 <div id="rotMsg"><div class="ri">📱</div><p>ROTATE TO LANDSCAPE<br>TO PLAY STRKER</p></div>
@@ -512,6 +533,12 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
   </div>
 </div>
  
+
+<div id="pauseOverlay" style="display:none; position:fixed; inset:0; background:rgba(10,15,26,0.85); backdrop-filter:blur(8px); z-index:1000; flex-direction:column; align-items:center; justify-content:center; gap:20px;">
+  <div style="font-family:'Russo One',sans-serif; font-size:48px; color:var(--accent); letter-spacing:4px; text-shadow:0 0 20px rgba(244,162,97,0.3);">PAUSED</div>
+  <button class="btn btn-p" onclick="togglePause(false)">▶ RESUME</button>
+  <button class="btn" onclick="backMenu(); togglePause(false);">🏠 EXIT TO MENU</button>
+</div>
 
 <canvas id="gameCanvas"></canvas>
 
@@ -941,6 +968,12 @@ const keys={};
 window.addEventListener('keydown',e=>{
   keys[e.code]=true;
   if(['Space','ShiftLeft','ShiftRight','Tab'].includes(e.code))e.preventDefault();
+  if(e.code === 'Escape' || e.code === 'KeyP') {
+    if (gs === 'playing' || gs === 'kickoff' || gs === 'goal') {
+      togglePause(!isPaused);
+      e.preventDefault();
+    }
+  }
 });
 window.addEventListener('keyup',e=>delete keys[e.code]);
 
@@ -2502,18 +2535,41 @@ function serSt(){
 // ═══════════════════════════════════════════════════════
 // GAME FLOW
 // ═══════════════════════════════════════════════════════
+let isPaused = false;
+function togglePause(p) {
+  SFX.select();
+  isPaused = p;
+  const overlay = document.getElementById('pauseOverlay');
+  if (overlay) {
+    overlay.style.display = p ? 'flex' : 'none';
+  }
+  const pBtn = document.getElementById('pauseBtn');
+  if (pBtn) {
+    pBtn.textContent = p ? '▶' : '⏸';
+  }
+  if(isPaused) {
+    BGM.stop();
+  } else {
+    if(SFX.on) BGM.start();
+  }
+}
+
 function beginMatch(){
   ['menuScreen','teamScreen','tournamentScreen','signalScreen','endScreen'].forEach(hideScr);
   document.getElementById('mainMenuTrayToggle').style.display = 'none';
-if(gMode === 'training') {
-    document.getElementById('trainingTrayToggle').style.display = 'flex';
-} else {
-    document.getElementById('trainingTrayToggle').style.display = 'none';
-}
-createTeams();gs='kickoff';koTimer=90;
-    SFX.whistle();trigCM('ko');
+  if(gMode === 'training') {
+      document.getElementById('trainingTrayToggle').style.display = 'flex';
+  } else {
+      document.getElementById('trainingTrayToggle').style.display = 'none';
+  }
+  
+  if(!document.fullscreenElement){
+    document.documentElement.requestFullscreen().catch(()=>{});
+  }
+  
+  createTeams();gs='kickoff';koTimer=90;
+  SFX.whistle();trigCM('ko');
   if(gMode === 'training' && trnMode === 'ai_vs_ai') {
-      // Clear human assignment so system handles players automatically
       human = null; 
   }
   const fwd=gT(koTeam).find(p=>p.role==='fwd');
@@ -2521,9 +2577,12 @@ createTeams();gs='kickoff';koTimer=90;
   if(fwd){ball.x=fwd.x;ball.y=fwd.y;ball.own=fwd.id;ball.lt=koTeam;}
   lastTS=performance.now();accum=0;
   document.getElementById('sndBtn').classList.add('vis');
-document.getElementById('exitBtn').classList.add('vis');
+  document.getElementById('exitBtn').classList.add('vis');
+  document.getElementById('pauseBtn').classList.add('vis');
+  togglePause(false);
   requestAnimationFrame(gameLoop);
 }
+
 function showEnd(){
   showScr('endScreen');
   document.getElementById('endTitle').textContent='FULL TIME';
@@ -2532,6 +2591,10 @@ function showEnd(){
   document.getElementById('eDot1').style.background=CFG.t1c;document.getElementById('eDot2').style.background=CFG.t2c;
   document.getElementById('eS1').style.color=CFG.t1c;document.getElementById('eS2').style.color=CFG.t2c;
   document.getElementById('tMsg').style.display='none';
+  
+  document.getElementById('pauseBtn').classList.remove('vis');
+  togglePause(false);
+  
   let lbl='Draw!';
   if(score[0]>score[1])lbl=isMulti?(isHost?'You Win!':'You Lose!'):`${CFG.t1nm} Win!`;
   else if(score[1]>score[0])lbl=isMulti?(isHost?'You Lose!':'You Win!'):`${CFG.t2nm} Win!`;
@@ -2544,6 +2607,7 @@ function showEnd(){
   SFX.fulltime();trigCM('full');
   if(trn)onTrnEnd();
 }
+
 function backMenu(){
   gs='menu';trn=null;netRole=null;netMatchStarted=false;netTeams.host=null;netTeams.guest=null;
   if(peer){peer.close();peer=null;inputChan=null;eventChan=null;}
@@ -2551,8 +2615,11 @@ function backMenu(){
   document.getElementById('mainMenuTrayToggle').style.display = 'flex';
   document.getElementById('trainingTrayToggle').style.display = 'none';
   toggleConfigTray(false);
-  showScr('menuScreen');document.getElementById('sndBtn').classList.remove('vis');
-  document.getElementById('exitBtn').classList.add('vis');
+  showScr('menuScreen');
+  document.getElementById('sndBtn').classList.remove('vis');
+  document.getElementById('exitBtn').classList.remove('vis');
+  document.getElementById('pauseBtn').classList.remove('vis');
+  togglePause(false);
   applyTeams(0,1);createTeams();render();
 }
 
@@ -2725,8 +2792,13 @@ function initMobile(){
 // ═══════════════════════════════════════════════════════
 function gameLoop(ts){
   if(gs==='menu')return;
-  const dt=Math.min((ts-lastTS)/1000,.05);lastTS=ts;accum+=dt;
-  while(accum>=TICK){update(TICK);accum-=TICK;}
+  const dt=Math.min((ts-lastTS)/1000,.05);lastTS=ts;
+  if(!isPaused) {
+    accum+=dt;
+    while(accum>=TICK){update(TICK);accum-=TICK;}
+  } else {
+    accum=0;
+  }
   if(isHost&&isMulti){netAccum+=dt;if(netAccum>=1/30){netAccum=0;sndNet(serSt());}}
   if(!isHost&&isMulti){
     netAccum+=dt;
@@ -2752,6 +2824,14 @@ function gameLoop(ts){
 function initPenalty() {
   gs = 'penalty';
   pen = { active: true, round: 1, s: [0,0], turn: 0, st: 'aim', tm: 0, tY: F.y+F.h/2, aiGy: F.y+F.h/2 };
+  
+  if(!document.fullscreenElement){
+    document.documentElement.requestFullscreen().catch(()=>{});
+  }
+  document.getElementById('exitBtn').classList.add('vis');
+  document.getElementById('pauseBtn').classList.add('vis');
+  togglePause(false);
+  
   setupPen();
 }
 
@@ -3046,13 +3126,12 @@ const fsBtn = document.getElementById("fsBtn");
 const exitBtn=document.getElementById("exitBtn");
 
 exitBtn.onclick=()=>{
-
-    if(confirm("Exit the current match?")){
-
-        backMenu();
-
+  if(confirm("Exit the current match?")){
+    if(document.fullscreenElement){
+      document.exitFullscreen().catch(()=>{});
     }
-
+    backMenu();
+  }
 };
 
 fsBtn.addEventListener("click", async () => {
