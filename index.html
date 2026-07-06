@@ -97,7 +97,8 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
 #menuScreen{
   background:linear-gradient(160deg,#0A0F1A 0%,#0e1c10 55%,#0A0F1A 100%);
   position:relative;
-  overflow:hidden;
+  overflow-x:hidden;
+  overflow-y:auto;
 }
 #menuScreen::before {
   content:'';
@@ -333,6 +334,14 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
             <label id="lblBtnPos" style="display: flex; justify-content: space-between; font-size: 11px; color: var(--muted);">ACTION RIGHT COLUMN MARGIN: 70px</label>
             <input type="range" id="cfgBtnPos" min="10" max="180" value="70" oninput="applyLiveInterfaceEngine()" style="width: 100%;">
           </div>
+          <hr style="border: 0; border-top: 1px solid var(--border); margin: 6px 0;">
+          <div>
+            <label style="display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 4px;">CONTROL INTERFACE MODE</label>
+            <select id="cfgControlMode" onchange="switchControlMode(this.value)" style="width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--border); font-size: 12px; font-family: 'Space Grotesk'; border-radius: 6px; padding: 6px 10px; cursor: pointer;">
+              <option value="gestures">✨ MODERN GESTURES (SWIPE/TAP/FLOATING)</option>
+              <option value="classic">🕹️ CLASSIC BUTTONS (FIXED DPAD/CONTROLS)</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -398,29 +407,32 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
 
 <!-- MENU -->
 <div id="menuScreen" class="screen">
-  <div class="menu-title" style="animation: titleGlow 4s infinite alternate ease-in-out, slideUpFade 0.6s ease forwards;">STRKER</div>
-  <div class="menu-sub menu-btn-animate" style="animation-delay: 0.05s;">Football</div>
-  <button class="btn btn-p menu-btn-animate" style="animation-delay: 0.1s;" onclick="goTeamSel('single')">⚽ SINGLE PLAYER</button>
-  <button class="btn menu-btn-animate" style="animation-delay: 0.15s;" onclick="goTeamSel('tournament')">🏆 TOURNAMENT</button>
-  <button class="btn menu-btn-animate" style="animation-delay: 0.2s;" onclick="showTraining()">🧪 TRAINING</button>
-  <button class="btn menu-btn-animate" id="pwaInstallBtn" onclick="triggerPwaInstall()" style="display:none; border-color:#06D6A0; color:#06D6A0; box-shadow: 0 0 12px rgba(6,214,160,.2); animation-delay: 0.25s;">📲 INSTALL APP</button>
-  <div class="menu-btn-animate" style="margin: 15px 0 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; animation-delay: 0.3s;">
-    <label style="font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px;">AI Difficulty</label>
-    <div style="display: flex; gap: 5px;">
-      <button class="btn btn-sm diff-btn" id="diffBtn_easy" onclick="setDifficulty('easy')">EASY</button>
-      <button class="btn btn-sm diff-btn" id="diffBtn_medium" onclick="setDifficulty('medium')">MEDIUM</button>
-      <button class="btn btn-sm diff-btn active" id="diffBtn_hard" onclick="setDifficulty('hard')">HARD</button>
-      <button class="btn btn-sm diff-btn" id="diffBtn_legend" onclick="setDifficulty('legend')">LEGEND</button>
+  <div class="menu-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin: auto 0; width: 100%; z-index: 2; position: relative;">
+    <div class="menu-title" style="animation: titleGlow 4s infinite alternate ease-in-out, slideUpFade 0.6s ease forwards;">STRKER</div>
+    <div class="menu-sub menu-btn-animate" style="animation-delay: 0.05s;">Football</div>
+    <button class="btn btn-p menu-btn-animate" style="animation-delay: 0.1s;" onclick="goTeamSel('single')">⚽ SINGLE PLAYER</button>
+    <button class="btn menu-btn-animate" style="animation-delay: 0.15s;" onclick="goTeamSel('tournament')">🏆 TOURNAMENT</button>
+    <button class="btn menu-btn-animate" style="animation-delay: 0.2s;" onclick="showTraining()">🧪 TRAINING</button>
+    <button class="btn menu-btn-animate" id="pwaInstallBtn" onclick="triggerPwaInstall()" style="display:none; border-color:#06D6A0; color:#06D6A0; box-shadow: 0 0 12px rgba(6,214,160,.2); animation-delay: 0.25s;">📲 INSTALL APP</button>
+    <div class="menu-btn-animate" style="margin: 15px 0 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; animation-delay: 0.3s;">
+      <label style="font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px;">AI Difficulty</label>
+      <div style="display: flex; gap: 5px;">
+        <button class="btn btn-sm diff-btn" id="diffBtn_easy" onclick="setDifficulty('easy')">EASY</button>
+        <button class="btn btn-sm diff-btn" id="diffBtn_medium" onclick="setDifficulty('medium')">MEDIUM</button>
+        <button class="btn btn-sm diff-btn active" id="diffBtn_hard" onclick="setDifficulty('hard')">HARD</button>
+        <button class="btn btn-sm diff-btn" id="diffBtn_legend" onclick="setDifficulty('legend')">LEGEND</button>
+      </div>
+    </div>
+    <button class="btn menu-btn-animate" style="animation-delay: 0.35s;" onclick="showSig('host')">➕ CREATE MATCH</button>
+    <button class="btn menu-btn-animate" style="animation-delay: 0.4s;" onclick="showSig('guest')">🔗 JOIN MATCH</button>
+    <div class="ctrl">
+      <div class="ci"><span class="key">WASD</span>Move</div>
+      <div class="ci"><span class="key">SPACE</span>Pass/Tackle</div>
+      <div class="ci"><span class="key">SHIFT</span>Shoot (Hold to Aim)</div>
+      <div class="ci"><span class="key">TAB</span>Switch Player</div>
     </div>
   </div>
-  <button class="btn menu-btn-animate" style="animation-delay: 0.35s;" onclick="showSig('host')">➕ CREATE MATCH</button>
-  <button class="btn menu-btn-animate" style="animation-delay: 0.4s;" onclick="showSig('guest')">🔗 JOIN MATCH</button>
-  <div class="ctrl">
-    <div class="ci"><span class="key">WASD</span>Move</div>
-    <div class="ci"><span class="key">SPACE</span>Pass/Tackle</div>
-    <div class="ci"><span class="key">SHIFT</span>Charge Shot</div>
-    <div class="ci"><span class="key">TAB</span>Cycle Target</div>
-  </div>
+</div>
 </div>
 
 <!-- TEAM SELECT -->
@@ -996,6 +1008,7 @@ let human=null;
 let passHeld=false,tabHeld=false;
 let shtHeld=false,shtPow=0;
 let sprintMob=false;
+let controlMode='gestures';
 let halfFired=false;
 // Pass target
 let pTargets=[],pTgtIdx=0,curPTgt=null;
@@ -2722,9 +2735,10 @@ function initMobile(){
     return null;
   }
 
+  // 1. Gesture Controls window-level touch handlers
   window.addEventListener('touchstart', e => {
     SFX.res();
-    if(gs === 'menu') return;
+    if(gs === 'menu' || controlMode === 'classic') return;
     
     for (let i = 0; i < e.changedTouches.length; i++) {
       const t = e.changedTouches[i];
@@ -2778,7 +2792,7 @@ function initMobile(){
   }, {passive: false});
 
   window.addEventListener('touchmove', e => {
-    if(gs === 'menu') return;
+    if(gs === 'menu' || controlMode === 'classic') return;
     
     for (let i = 0; i < e.touches.length; i++) {
       const t = e.touches[i];
@@ -2810,7 +2824,8 @@ function initMobile(){
     }
   }, {passive: false});
 
-  const rst = (e) => {
+  const rstGestures = (e) => {
+    if (controlMode === 'classic') return;
     for (let i = 0; i < e.changedTouches.length; i++) {
       const t = e.changedTouches[i];
       
@@ -2860,8 +2875,84 @@ function initMobile(){
     }
   };
 
-  window.addEventListener('touchend', rst);
-  window.addEventListener('touchcancel', rst);
+  window.addEventListener('touchend', rstGestures);
+  window.addEventListener('touchcancel', rstGestures);
+
+  // 2. Classic controls fixed joystick touch listeners
+  zone.addEventListener('touchstart', e => {
+    if (controlMode !== 'classic') return;
+    SFX.res();
+    const r = zone.getBoundingClientRect();
+    sx = r.left + r.width / 2;
+    sy = r.top + r.height / 2;
+    
+    const touch = e.changedTouches[0];
+    moveTouchId = touch.identifier;
+    mob.on = true;
+    e.preventDefault();
+  }, {passive: false});
+
+  zone.addEventListener('touchmove', e => {
+    if (controlMode !== 'classic' || !mob.on) return;
+    
+    let activeTouch = null;
+    for (let i = 0; i < e.touches.length; i++) {
+      if (e.touches[i].identifier === moveTouchId) {
+        activeTouch = e.touches[i];
+        break;
+      }
+    }
+    if (!activeTouch) return;
+
+    let mx = activeTouch.clientX - sx, my = activeTouch.clientY - sy;
+    const ln = Math.hypot(mx, my);
+    if (ln > maxR) { mx = mx / ln * maxR; my = my / ln * maxR; }
+    knob.style.transform = `translate(${mx}px,${my}px)`;
+    mob.dx = mx / maxR;
+    mob.dy = my / maxR;
+    e.preventDefault();
+  }, {passive: false});
+
+  const rstClassic = (e) => {
+    if (controlMode !== 'classic') return;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === moveTouchId) {
+        mob.on = false;
+        mob.dx = 0;
+        mob.dy = 0;
+        moveTouchId = null;
+        knob.style.transform = 'translate(0,0)';
+      }
+    }
+  };
+  zone.addEventListener('touchend', rstClassic);
+  zone.addEventListener('touchcancel', rstClassic);
+
+  // 3. Classic buttons tap helpers
+  function mb2(id,dn,up){
+    const el=document.getElementById(id);
+    if(!el)return;
+    el.addEventListener('touchstart',e=>{
+      if (controlMode !== 'classic') return;
+      dn();el.classList.add('on');e.preventDefault();
+    },{passive:false});
+    el.addEventListener('touchend',()=>{
+      if (controlMode !== 'classic') return;
+      up();el.classList.remove('on');
+    });
+    el.addEventListener('touchcancel',()=>{
+      if (controlMode !== 'classic') return;
+      up();el.classList.remove('on');
+    });
+  }
+  
+  mb2('mPas',()=>keys['Space']=true,()=>delete keys['Space']);
+  mb2('mSht',
+    ()=>{keys['ShiftLeft']=true;document.getElementById('pwrMtr').style.visibility='visible';},
+    ()=>{delete keys['ShiftLeft'];document.getElementById('pwrMtr').style.visibility='hidden';}
+  );
+  mb2('mSpr',()=>sprintMob=true,()=>sprintMob=false);
+  mb2('mCyc',()=>{pTgtIdx=(pTgtIdx+1)%Math.max(1,pTargets.length);SFX.select();},()=>{});
 
   window.addEventListener('touchstart',()=>{
     if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{});
@@ -3200,6 +3291,14 @@ function init(){
   updateCommentarySettings();
   updateCrowdSettings();
   
+  // Load control mode from settings or localStorage
+  controlMode = localStorage.getItem('controlMode') || 'gestures';
+  const cfgControlMode = document.getElementById('cfgControlMode');
+  if (cfgControlMode) {
+    cfgControlMode.value = controlMode;
+  }
+  switchControlMode(controlMode);
+  
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js')
       .then(reg => console.log('Service Worker registered', reg))
@@ -3219,6 +3318,7 @@ exitBtn.onclick=()=>{
     backMenu();
   }
 };
+document.getElementById('pauseBtn').onclick = () => togglePause(!isPaused);
 
 fsBtn.addEventListener("click", async () => {
     try{
@@ -3381,6 +3481,43 @@ function applyLiveInterfaceEngine() {
     btn.style.width = `${bSize}px`;
     btn.style.height = `${parseFloat(bSize) * 0.97}px`;
   });
+}
+
+function switchControlMode(mode) {
+  SFX.select();
+  controlMode = mode;
+  localStorage.setItem('controlMode', mode);
+  
+  const buttonsPanel = document.querySelector('.aPne');
+  const joystickZone = document.getElementById('jZone');
+  
+  if (mode === 'classic') {
+    if (buttonsPanel) {
+      buttonsPanel.style.setProperty('display', 'flex', 'important');
+    }
+    if (joystickZone) {
+      joystickZone.style.display = 'block';
+      joystickZone.style.opacity = '1';
+      joystickZone.style.pointerEvents = 'auto';
+      
+      const joySize = document.getElementById('cfgJoySize')?.value || 130;
+      const joyPos = document.getElementById('cfgJoyPos')?.value || 10;
+      joystickZone.style.width = `${joySize}px`;
+      joystickZone.style.height = `${joySize}px`;
+      joystickZone.style.left = `${joyPos}px`;
+      joystickZone.style.top = '80%';
+      joystickZone.style.transform = 'translateY(-50%)';
+    }
+  } else {
+    if (buttonsPanel) {
+      buttonsPanel.style.setProperty('display', 'none', 'important');
+    }
+    if (joystickZone) {
+      joystickZone.style.display = 'none';
+      joystickZone.style.opacity = '0';
+      joystickZone.style.pointerEvents = 'none';
+    }
+  }
 }
 
 function restoreEngineSystemDefaults() {
