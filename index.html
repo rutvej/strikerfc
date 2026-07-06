@@ -11,7 +11,7 @@
 <style>
 #exitBtn{
     position:fixed;
-    top:12px;
+    top:calc(12px + env(safe-area-inset-top, 0px));
     right:144px;
     z-index:300;
     width:34px;
@@ -32,7 +32,7 @@
 }
 #pauseBtn{
     position:fixed;
-    top:12px;
+    top:calc(12px + env(safe-area-inset-top, 0px));
     right:188px;
     z-index:300;
     width:34px;
@@ -52,7 +52,7 @@
 }
 #cmBtn{
     position:fixed;
-    top:12px;
+    top:calc(12px + env(safe-area-inset-top, 0px));
     right:100px;
     z-index:300;
     width:34px;
@@ -69,8 +69,8 @@
 }
 #fsBtn{
     position:fixed;
-    top:12px;
-    right:56px;   /* Next to the sound button */
+    top:calc(12px + env(safe-area-inset-top, 0px));
+    right:56px;
     z-index:300;
     width:34px;
     height:34px;
@@ -244,7 +244,7 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
 #commentary{position:fixed;bottom:88px;left:50%;transform:translateX(-50%);z-index:200;pointer-events:none;white-space:nowrap;transition:opacity .4s;opacity:0}
 #cmtxt{font-family:'Russo One',sans-serif;font-size:clamp(11px,2.5vw,16px);letter-spacing:.5px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.8);background:rgba(10,15,26,.75);padding:5px 16px;border-radius:18px;backdrop-filter:blur(6px);border:1px solid rgba(244,162,97,.2)}
 /* Sound btn */
-#sndBtn{position:fixed;top:12px;right:12px;z-index:300;background:rgba(17,24,39,.88);border:1px solid var(--border);color:var(--fg);font-size:15px;width:34px;height:34px;border-radius:8px;cursor:pointer;display:none;align-items:center;justify-content:center}
+#sndBtn{position:fixed;top:calc(12px + env(safe-area-inset-top, 0px));right:12px;z-index:300;background:rgba(17,24,39,.88);border:1px solid var(--border);color:var(--fg);font-size:15px;width:34px;height:34px;border-radius:8px;cursor:pointer;display:none;align-items:center;justify-content:center}
 #sndBtn.vis{display:flex}
 /* Toast */
 .toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);padding:9px 20px;background:var(--card);border:1px solid var(--border);border-radius:8px;font-size:13px;z-index:500;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
@@ -258,7 +258,9 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
     background: rgba(255,255,255,.05);
     border: 2px dashed rgba(244,162,97,.35);
     border-radius: 50%;
-    position: absolute;
+    position: fixed;
+    left: 10px;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
     display: none;
     opacity: 0;
     pointer-events: auto;
@@ -274,7 +276,14 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
 }
 
 .aPne {
+    position: fixed;
+    right: 70px;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
     display: none !important; /* Fully hide buttons panel for modern gesture controls */
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    z-index: 151;
 }
 
 
@@ -661,17 +670,21 @@ const SFX={
   kick(){this._o(55,.12,'sine',.45,140);this._n(.05,.16,300)},
   shoot(){this._o(65,.1,'sine',.38,180);this._n(.04,.12,380)},
   whistle(){[1450,1650,1450].forEach((f,i)=>this._o(f,.2,'sine',.18,null,i*.18))},
-  goal(){[523,659,784,1047].forEach((f,i)=>this._o(f,.3,'square',.13,null,i*.12));this._n(2,.05,700,.35)},
+  goal(){
+    this._o(988,.09,'triangle',.2,660);
+    this._o(1480,.05,'sine',.08,1480,.04);
+  },
   tackle(){this._n(.08,.28,350);this._o(55,.07,'sine',.2,110)},
   save(){[392,523,659].forEach((f,i)=>this._o(f,.2,'triangle',.1,null,i*.07))},
   select(){this._o(880,.06,'sine',.1)},
-  halftime(){[523,440,392,330].forEach((f,i)=>this._o(f,.28,'sine',.13,null,i*.17))},
-  fulltime(){[330,392,440,523].forEach((f,i)=>this._o(f,.32,'square',.11,null,i*.15))},
+  halftime(){if(!BGM.on)return;[523,440,392,330].forEach((f,i)=>this._o(f,.28,'sine',.13,null,i*.17))},
+  fulltime(){if(!BGM.on)return;[330,392,440,523].forEach((f,i)=>this._o(f,.32,'square',.11,null,i*.15))},
   champion(){
+    if(!BGM.on) return;
     [523,659,784,1047,1319].forEach((f,i)=>this._o(f,.35,'square',.13,null,i*.11));
     setTimeout(()=>[523,659,784].forEach((f,i)=>this._o(f,.4,'sine',.1,null,i*.09)),700);
   },
-  advance(){[523,659,784,1047].forEach((f,i)=>this._o(f,.3,'square',.12,null,i*.13))},
+  advance(){if(!BGM.on)return;[523,659,784,1047].forEach((f,i)=>this._o(f,.3,'square',.12,null,i*.13))},
   charge(p){this._o(440+p*440,.04,'sine',p*.12)},
 };
 
@@ -682,10 +695,10 @@ const BGM = {
   intervalId: null,
   step: 0,
   chords: [
-    { bass: 110.00, pad: [220.00, 261.63, 329.63] }, // Am
-    { bass: 87.31,  pad: [220.00, 261.63, 349.23] }, // F
-    { bass: 130.81, pad: [261.63, 329.63, 392.00] }, // C (C3 bass)
-    { bass: 98.00,  pad: [196.00, 246.94, 293.66] }  // G
+    { bass: 98.00,  pad: [196.00, 246.94, 293.66] },  // G
+    { bass: 87.31,  pad: [174.61, 220.00, 261.63] },   // F
+    { bass: 110.00, pad: [220.00, 261.63, 329.63] },   // Am
+    { bass: 123.47, pad: [246.94, 293.66, 369.99] }    // Bdim-ish tension
   ],
   init() {
     this._ctx = SFX.c;
@@ -706,10 +719,10 @@ const BGM = {
           chord.pad.forEach((freq, idx) => {
             const osc = this._ctx.createOscillator();
             const gain = this._ctx.createGain();
-            osc.type = 'sine';
+            osc.type = idx === 0 ? 'triangle' : 'sine';
             osc.frequency.setValueAtTime(freq, t);
             gain.gain.setValueAtTime(0.0, t);
-            gain.gain.linearRampToValueAtTime(0.025, t + 0.6);
+            gain.gain.linearRampToValueAtTime(0.018, t + 0.6);
             gain.gain.exponentialRampToValueAtTime(0.001, t + 5.2);
             osc.connect(gain);
             gain.connect(this._ctx.destination);
@@ -726,7 +739,7 @@ const BGM = {
           filter.type = 'lowpass';
           filter.frequency.setValueAtTime(140, t);
           bassGain.gain.setValueAtTime(0.0, t);
-          bassGain.gain.linearRampToValueAtTime(0.09, t + 0.1);
+          bassGain.gain.linearRampToValueAtTime(0.06, t + 0.1);
           bassGain.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
           bassOsc.connect(filter);
           filter.connect(bassGain);
@@ -786,57 +799,73 @@ const CrowdNoise={
       const noiseBuf=c.createBuffer(1,sr*3,sr);
       const noiseData=noiseBuf.getChannelData(0);
       for(let i=0;i<noiseData.length;i++){
-        const fade=Math.pow(1-i/noiseData.length,1.35);
-        noiseData[i]=(Math.random()*2-1)*fade;
+        const fade=Math.pow(1-i/noiseData.length,1.15);
+        const shimmer = Math.sin(i * 0.0021) * 0.22 + Math.sin(i * 0.0057) * 0.13;
+        noiseData[i]=((Math.random()*2-1)*0.72 + shimmer) * fade;
       }
       const noise=c.createBufferSource();
       noise.buffer=noiseBuf;
       noise.loop=true;
-      const crowdFilter=c.createBiquadFilter();
-      crowdFilter.type='bandpass';
-      crowdFilter.frequency.value=920;
-      crowdFilter.Q.value=0.7;
-      const crowdGain2=c.createGain();
-      crowdGain2.gain.value=0.55;
-
-      const bedOsc=c.createOscillator();
-      const bedFilter=c.createBiquadFilter();
-      bedOsc.type='sine';
-      bedOsc.frequency.value=52;
-      bedFilter.type='lowpass';
-      bedFilter.frequency.value=130;
-      bedGain.gain.value=0.08;
-
+      const lowFilter=c.createBiquadFilter();
+      lowFilter.type='lowpass';
+      lowFilter.frequency.value=420;
+      lowFilter.Q.value=0.4;
+      const midFilter=c.createBiquadFilter();
+      midFilter.type='bandpass';
+      midFilter.frequency.value=1040;
+      midFilter.Q.value=0.9;
+      const lowGain=c.createGain();
+      const midGain=c.createGain();
+      const roarLfo=c.createOscillator();
+      const roarLfoGain=c.createGain();
       const chantOsc=c.createOscillator();
       const chantGain2=c.createGain();
-      chantOsc.type='triangle';
-      chantOsc.frequency.value=2.8;
-      chantGain2.gain.value=0.02;
+      const pulseOsc=c.createOscillator();
+      const pulseGain=c.createGain();
 
-      noise.connect(crowdFilter);
-      crowdFilter.connect(crowdGain2);
-      crowdGain2.connect(crowdGain);
-      bedOsc.connect(bedFilter);
-      bedFilter.connect(bedGain);
+      roarLfo.type='sine';
+      roarLfo.frequency.value=0.16;
+      roarLfoGain.gain.value=260;
+      roarLfo.connect(roarLfoGain);
+      roarLfoGain.connect(midFilter.frequency);
+
+      noise.connect(lowFilter);
+      noise.connect(midFilter);
+      lowFilter.connect(lowGain);
+      midFilter.connect(midGain);
+      lowGain.gain.value=0.10;
+      midGain.gain.value=0.07;
+
+      chantOsc.type='triangle';
+      chantOsc.frequency.value=2.35;
+      chantGain2.gain.value=0.016;
       chantOsc.connect(chantGain2);
+
+      pulseOsc.type='sine';
+      pulseOsc.frequency.value=0.34;
+      pulseGain.gain.value=0.045;
+      pulseOsc.connect(pulseGain);
+      pulseGain.connect(crowdGain.gain);
+
+      lowGain.connect(crowdGain);
+      midGain.connect(crowdGain);
       chantGain2.connect(chantGain);
       crowdGain.connect(mixer);
-      bedGain.connect(mixer);
       chantGain.connect(mixer);
       mixer.connect(c.destination);
 
       const base = this.on ? this.vol : 0;
       mixer.gain.value = base;
-      crowdGain.gain.value = base * 0.9;
-      bedGain.gain.value = base * 0.18;
-      chantGain.gain.value = base * 0.22;
+      crowdGain.gain.value = base * 0.92;
+      chantGain.gain.value = base * 0.18;
 
       noise.start();
-      bedOsc.start();
+      roarLfo.start();
       chantOsc.start();
+      pulseOsc.start();
       this._src=noise;
       this._gain=mixer;
-      this._bed=bedOsc;
+      this._bed=roarLfo;
       this._chant=chantOsc;
     }catch(e){}
   },
@@ -869,23 +898,26 @@ function triggerCrowdGasp() {
   if (!CrowdNoise.on || !SFX.c) return;
   try {
     const t = SFX.c.currentTime;
-    const osc = SFX.c.createOscillator();
+    const noise = SFX.c.createBufferSource();
     const gain = SFX.c.createGain();
     const filter = SFX.c.createBiquadFilter();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(80, t);
+    const buf = SFX.c.createBuffer(1, SFX.c.sampleRate * 0.9, SFX.c.sampleRate);
+    const dat = buf.getChannelData(0);
+    for (let i = 0; i < dat.length; i++) dat[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / dat.length, 0.6);
+    noise.buffer = buf;
+    noise.loop = false;
     filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(250, t);
-    filter.Q.setValueAtTime(2.0, t);
-    filter.frequency.exponentialRampToValueAtTime(750, t + 0.35);
+    filter.frequency.setValueAtTime(520, t);
+    filter.frequency.exponentialRampToValueAtTime(1700, t + 0.3);
+    filter.Q.setValueAtTime(1.6, t);
     gain.gain.setValueAtTime(0.0, t);
-    gain.gain.linearRampToValueAtTime(CrowdNoise.vol * 0.3, t + 0.1);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
-    osc.connect(filter);
+    gain.gain.linearRampToValueAtTime(CrowdNoise.vol * 0.14, t + 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+    noise.connect(filter);
     filter.connect(gain);
     gain.connect(SFX.c.destination);
-    osc.start(t);
-    osc.stop(t + 1.0);
+    noise.start(t);
+    noise.stop(t + 0.72);
   } catch(e){}
 }
 
@@ -894,23 +926,29 @@ function triggerGoalCheer() {
   try {
     const t = SFX.c.currentTime;
     for (let i = 0; i < 3; i++) {
-      const noise = SFX.c.createOscillator();
+      const noise = SFX.c.createBufferSource();
       const gain = SFX.c.createGain();
       const filter = SFX.c.createBiquadFilter();
-      noise.type = 'sawtooth';
-      noise.frequency.setValueAtTime(95 + i * 40, t);
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(350, t);
-      filter.frequency.exponentialRampToValueAtTime(1100, t + 0.6);
-      filter.frequency.exponentialRampToValueAtTime(280, t + 3.8);
+      const buf = SFX.c.createBuffer(1, SFX.c.sampleRate * 2.0, SFX.c.sampleRate);
+      const dat = buf.getChannelData(0);
+      for (let j = 0; j < dat.length; j++) {
+        const swell = Math.sin((j / dat.length) * Math.PI * 2 * (1.5 + i * 0.2)) * 0.22;
+        dat[j] = ((Math.random() * 2 - 1) * 0.6 + swell) * Math.pow(1 - j / dat.length, 0.25);
+      }
+      noise.buffer = buf;
+      noise.loop = false;
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(620 + i * 140, t);
+      filter.frequency.exponentialRampToValueAtTime(1350 + i * 180, t + 0.7);
+      filter.Q.setValueAtTime(1.0, t);
       gain.gain.setValueAtTime(0.0, t);
-      gain.gain.linearRampToValueAtTime(CrowdNoise.vol * 0.35, t + 0.35);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 4.6);
+      gain.gain.linearRampToValueAtTime(CrowdNoise.vol * 0.22, t + 0.18 + i * 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 2.0 + i * 0.12);
       noise.connect(filter);
       filter.connect(gain);
       gain.connect(SFX.c.destination);
-      noise.start(t);
-      noise.stop(t + 4.7);
+      noise.start(t + i * 0.05);
+      noise.stop(t + 2.1 + i * 0.12);
     }
   } catch(e){}
 }
@@ -918,9 +956,12 @@ let bestVoice=null;
 function chooseBestVoice(){
   const voices=window.speechSynthesis?.getVoices()||[];
   if(!voices.length) return null;
-  const preferred=['en-GB','en-US','en'];
-  const exact=voices.find(v=>preferred.some(p=>v.lang.startsWith(p))&&/male|alex|daniel|english/.test(v.name.toLowerCase()));
+  const preferred=['en-GB','en-US','en-AU','en'];
+  const maleName=/\b(male|alex|daniel|david|mark|sam|oliver|george|james|john|microsoft david|google uk english male)\b/i;
+  const exact=voices.find(v=>preferred.some(p=>v.lang.startsWith(p))&&maleName.test(v.name));
   if(exact) return exact;
+  const regionalMale=voices.find(v=>maleName.test(v.name));
+  if(regionalMale) return regionalMale;
   const regional=voices.find(v=>preferred.some(p=>v.lang.startsWith(p)));
   return regional||voices[0];
 }
@@ -950,7 +991,7 @@ function speakCommentary(text){
   window.speechSynthesis.cancel();
   const utter1=new SpeechSynthesisUtterance(text);
   if(bestVoice) utter1.voice=bestVoice;
-  utter1.rate=1.05;utter1.pitch=1.05;utter1.volume=1;
+  utter1.rate=1.0;utter1.pitch=0.88;utter1.volume=1;
   window.speechSynthesis.speak(utter1);
   
   // Announcement loudspeaker stadium delay echo
@@ -958,7 +999,7 @@ function speakCommentary(text){
     if (commentaryMode === 'audio' && window.speechSynthesis.speaking) {
       const utter2=new SpeechSynthesisUtterance(text);
       if(bestVoice) utter2.voice=bestVoice;
-      utter2.rate=0.98;utter2.pitch=0.95;utter2.volume=0.35;
+      utter2.rate=0.96;utter2.pitch=0.82;utter2.volume=0.35;
       window.speechSynthesis.speak(utter2);
     }
   }, 220);
@@ -2792,7 +2833,7 @@ function showEnd(){
 }
 
 function backMenu(){
-  gs='menu';trn=null;netRole=null;netMatchStarted=false;netTeams.host=null;netTeams.guest=null;
+  gs='menu';trn=null;trnMode=null;gMode='single';selectingOpponent=false;selTeam=0;oppTeam=1;netRole=null;netMatchStarted=false;netTeams.host=null;netTeams.guest=null;isMulti=false;isHost=false;
   if(peer){
     try { peer.destroy(); } catch(e){}
     peer=null;
@@ -2802,6 +2843,10 @@ function backMenu(){
   document.getElementById('mainMenuTrayToggle').style.display = 'flex';
   document.getElementById('trainingTrayToggle').style.display = 'none';
   toggleConfigTray(false);
+  const trnOverlay=document.getElementById('trnMenuOverlay');
+  if(trnOverlay) trnOverlay.remove();
+  const pauseOverlay=document.getElementById('pauseOverlay');
+  if(pauseOverlay) pauseOverlay.style.display='none';
   showScr('menuScreen');
   document.getElementById('sndBtn').classList.remove('vis');
   document.getElementById('exitBtn').classList.remove('vis');
@@ -3307,7 +3352,30 @@ function update(dt){
 // ═══════════════════════════════════════════════════════
 // SCREEN HELPERS
 // ═══════════════════════════════════════════════════════
-function showScr(id){document.getElementById(id).classList.remove('hidden');}
+function restartMenuAnimations() {
+  const menu = document.getElementById('menuScreen');
+  if (!menu) return;
+  const title = menu.querySelector('.menu-title');
+  if (title) {
+    const original = title.style.animation;
+    title.style.animation = 'none';
+    void title.offsetWidth;
+    title.style.animation = original || 'titleGlow 4s infinite alternate ease-in-out';
+  }
+  menu.querySelectorAll('.menu-btn-animate').forEach(el => {
+    const delay = el.style.animationDelay || '0s';
+    el.style.animation = 'none';
+    void el.offsetWidth;
+    el.style.animation = 'slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards';
+    el.style.animationDelay = delay;
+  });
+}
+function showScr(id){
+  document.getElementById(id).classList.remove('hidden');
+  if (id === 'menuScreen') {
+    requestAnimationFrame(restartMenuAnimations);
+  }
+}
 function hideScr(id){document.getElementById(id).classList.add('hidden');}
 
   // ═══════════════════════════════════════════════════════
@@ -3336,7 +3404,7 @@ function showTraining() {
     <button class="btn btn-p" onclick="selectTrnType('single_team')">🛡️ SINGLE TEAM PLAY</button>
     <button class="btn" onclick="selectTrnType('ai_vs_ai')">🤖 AI VS AI VIEW</button>
     <button class="btn" onclick="selectTrnType('penalty_shoot')">🎯 PENALTY PRACTICE</button>
-    <button class="btn btn-sm" style="margin-top:20px;" onclick="document.getElementById('trnMenuOverlay').remove(); showScr('menuScreen');">← BACK</button>
+    <button class="btn btn-sm" style="margin-top:20px;" onclick="backMenu()">← BACK</button>
   `;
   document.body.appendChild(overlay);
 }
@@ -3451,7 +3519,7 @@ document.addEventListener("fullscreenchange",()=>{
 });
 
 window.addEventListener('popstate', () => {
-  if (gs !== 'menu' || !document.getElementById('menuScreen').classList.contains('hidden')) {
+  if (gs !== 'menu' || document.getElementById('menuScreen').classList.contains('hidden')) {
     backMenu();
   }
 });
@@ -3588,9 +3656,11 @@ function applyLiveInterfaceEngine() {
     jZone.style.width = `${jSize}px`;
     jZone.style.height = `${jSize}px`;
     jZone.style.left = `${jPos}px`;
+    jZone.style.bottom = 'calc(24px + env(safe-area-inset-bottom, 0px))';
   }
   if (aPne) {
     aPne.style.right = `${bPos}px`;
+    aPne.style.bottom = 'calc(24px + env(safe-area-inset-bottom, 0px))';
   }
 
   // Adjust relative size rules for active mobile button elements
@@ -3622,8 +3692,9 @@ function switchControlMode(mode) {
       joystickZone.style.width = `${joySize}px`;
       joystickZone.style.height = `${joySize}px`;
       joystickZone.style.left = `${joyPos}px`;
-      joystickZone.style.top = '80%';
-      joystickZone.style.transform = 'translateY(-50%)';
+      joystickZone.style.bottom = 'calc(24px + env(safe-area-inset-bottom, 0px))';
+      joystickZone.style.top = 'auto';
+      joystickZone.style.transform = 'none';
     }
   } else {
     if (buttonsPanel) {
