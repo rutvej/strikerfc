@@ -254,30 +254,19 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
 #jZone {
     width: 130px; 
     height: 130px;
-    background: rgba(255,255,255,.04);
-    border: 2px dashed rgba(244,162,97,.28);
+    background: rgba(255,255,255,.05);
+    border: 2px dashed rgba(244,162,97,.35);
     border-radius: 50%;
     position: absolute;
-    top: 80%; 
-    left: 10px; 
-    transform: translateY(-50%); 
-    pointer-events: auto;
+    display: none;
+    opacity: 0;
+    pointer-events: none;
     touch-action: none;
-    transition: width 0.05s ease-out, height 0.05s ease-out, left 0.05s ease-out; /* Smooth slide scaling */
+    transition: opacity 0.15s ease-out;
 }
 
-
-/* REPLACE OLD .aPne SECTOR WITH THIS RULE */
 .aPne {
-    display: flex;
-    flex-direction: column;
-    gap: 9px;
-    position: absolute;
-    top: 50%;
-    right: 70px;
-    transform: translateY(-50%);
-    pointer-events: auto;
-    transition: right 0.1s ease-out; /* Keeps layout shifts looking completely clean */
+    display: none !important; /* Fully hide buttons panel for modern gesture controls */
 }
 
 
@@ -774,6 +763,68 @@ const CrowdNoise={
     updateCrowdSettings();
   }
 };
+
+function updateCrowdDynamic() {
+  if (!CrowdNoise.on || !CrowdNoise._gain || !SFX.c) return;
+  const ballGoalDist = Math.min(
+    dst(ball.x, ball.y, F.x, F.y + F.h/2),
+    dst(ball.x, ball.y, F.x + F.w, F.y + F.h/2)
+  );
+  const maxDist = F.w / 2;
+  const closeness = clamp(1 - ballGoalDist / maxDist, 0, 1);
+  const targetVol = CrowdNoise.vol * (0.35 + closeness * 0.95);
+  CrowdNoise._gain.gain.setTargetAtTime(targetVol, SFX.c.currentTime, 0.4);
+}
+
+function triggerCrowdGasp() {
+  if (!CrowdNoise.on || !SFX.c) return;
+  try {
+    const t = SFX.c.currentTime;
+    const osc = SFX.c.createOscillator();
+    const gain = SFX.c.createGain();
+    const filter = SFX.c.createBiquadFilter();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(80, t);
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(250, t);
+    filter.Q.setValueAtTime(2.0, t);
+    filter.frequency.exponentialRampToValueAtTime(750, t + 0.35);
+    gain.gain.setValueAtTime(0.0, t);
+    gain.gain.linearRampToValueAtTime(CrowdNoise.vol * 0.3, t + 0.1);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(SFX.c.destination);
+    osc.start(t);
+    osc.stop(t + 1.0);
+  } catch(e){}
+}
+
+function triggerGoalCheer() {
+  if (!CrowdNoise.on || !SFX.c) return;
+  try {
+    const t = SFX.c.currentTime;
+    for (let i = 0; i < 3; i++) {
+      const noise = SFX.c.createOscillator();
+      const gain = SFX.c.createGain();
+      const filter = SFX.c.createBiquadFilter();
+      noise.type = 'sawtooth';
+      noise.frequency.setValueAtTime(95 + i * 40, t);
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(350, t);
+      filter.frequency.exponentialRampToValueAtTime(1100, t + 0.6);
+      filter.frequency.exponentialRampToValueAtTime(280, t + 3.8);
+      gain.gain.setValueAtTime(0.0, t);
+      gain.gain.linearRampToValueAtTime(CrowdNoise.vol * 0.35, t + 0.35);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 4.6);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(SFX.c.destination);
+      noise.start(t);
+      noise.stop(t + 4.7);
+    }
+  } catch(e){}
+}
 let bestVoice=null;
 function chooseBestVoice(){
   const voices=window.speechSynthesis?.getVoices()||[];
@@ -808,10 +859,20 @@ let commentaryMode='text'; // text | audio | off
 function speakCommentary(text){
   if(!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
-  const utter=new SpeechSynthesisUtterance(text);
-  if(bestVoice) utter.voice=bestVoice;
-  utter.rate=1.05;utter.pitch=1.05;utter.volume=1;
-  window.speechSynthesis.speak(utter);
+  const utter1=new SpeechSynthesisUtterance(text);
+  if(bestVoice) utter1.voice=bestVoice;
+  utter1.rate=1.05;utter1.pitch=1.05;utter1.volume=1;
+  window.speechSynthesis.speak(utter1);
+  
+  // Announcement loudspeaker stadium delay echo
+  setTimeout(() => {
+    if (commentaryMode === 'audio' && window.speechSynthesis.speaking) {
+      const utter2=new SpeechSynthesisUtterance(text);
+      if(bestVoice) utter2.voice=bestVoice;
+      utter2.rate=0.98;utter2.pitch=0.95;utter2.volume=0.35;
+      window.speechSynthesis.speak(utter2);
+    }
+  }, 220);
 }
 function generateCommentary(type,custom){
   if(custom) return custom;
@@ -1470,6 +1531,7 @@ function doShoot(sh,pow=1){
   ball.relBy=sh.id;ball.relT=10;
   for(let i=0;i<10;i++)parts.push(mkP(ball.x,ball.y,'rgba(255,255,255,.8)',2));
   SFX.shoot();recShot();mSt.shots[sh.team]++;
+  triggerCrowdGasp();
 }
 
 // IMPROVED GK CLEARANCE — finds best open teammate
@@ -1730,6 +1792,7 @@ function aiSht(p){
   ball.own=-1;ball.lt=p.team;
   for(let i=0;i<8;i++)parts.push(mkP(ball.x,ball.y,'rgba(255,255,255,.8)',2));
   SFX.shoot();mSt.shots[p.team]++;
+  triggerCrowdGasp();
 }
 
 function aiPos(p,team,opps){
@@ -1902,6 +1965,7 @@ function trigGoal(team){
   for(let i=0;i<25;i++)parts.push(mkP(gx,gy,'rgba(255,255,255,.9)',2));
   SFX.goal();trigCM('goal');
   if(score[0]===score[1])trigCM('level');else trigCM('lead');
+  triggerGoalCheer();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2610,7 +2674,11 @@ function showEnd(){
 
 function backMenu(){
   gs='menu';trn=null;netRole=null;netMatchStarted=false;netTeams.host=null;netTeams.guest=null;
-  if(peer){peer.close();peer=null;inputChan=null;eventChan=null;}
+  if(peer){
+    try { peer.destroy(); } catch(e){}
+    peer=null;
+  }
+  conn=null;
   ['signalScreen','endScreen','teamScreen','tournamentScreen'].forEach(hideScr);
   document.getElementById('mainMenuTrayToggle').style.display = 'flex';
   document.getElementById('trainingTrayToggle').style.display = 'none';
@@ -2628,153 +2696,172 @@ function backMenu(){
 // ═══════════════════════════════════════════════════════
 function initMobile(){
   const zone=document.getElementById('jZone'),knob=document.getElementById('jKnob');
-  if(!zone)return;let sx=0,sy=0;const maxR=43;
+  if(!zone)return;
+  let sx=0,sy=0;
+  const maxR=43;
+  let moveTouchId = null;
+  let rightTouchId = null;
+  let rx = 0, ry = 0;
+  let rightTouchTime = 0;
+  let isAimingShot = false;
 
-    let moveTouchId = null;
+  function getGameCoords(touchX, touchY) {
+    const rect = cv.getBoundingClientRect();
+    const canvasX = (touchX - rect.left) * (W / rect.width);
+    const canvasY = (touchY - rect.top) * (H / rect.height);
+    return { x: canvasX, y: canvasY };
+  }
 
-  zone.addEventListener('touchstart', e => {
-    SFX.res();
-    const r = zone.getBoundingClientRect();
-    sx = r.left + r.width / 2;
-    sy = r.top + r.height / 2;
-    
-    // Pick the fresh touch contact that started over the movement pad
-    const touch = e.changedTouches[0];
-    moveTouchId = touch.identifier;
-    mob.on = true;
-    e.preventDefault();
-  }, {passive: false});
-
-  zone.addEventListener('touchmove', e => {
-    if (!mob.on) return;
-    
-    // Look specifically for the moving finger tied to this joystick
-    let activeTouch = null;
-    for (let i = 0; i < e.touches.length; i++) {
-      if (e.touches[i].identifier === moveTouchId) {
-        activeTouch = e.touches[i];
-        break;
+  function findTappedPlayer(canvasX, canvasY, teamId) {
+    const teammates = gT(teamId).filter(p => p.role !== 'gk');
+    for (let p of teammates) {
+      if (dst(p.x, p.y, canvasX, canvasY) < 45) { // 45px touch tolerance
+        return p;
       }
     }
-    if (!activeTouch) return;
+    return null;
+  }
 
-    let mx = activeTouch.clientX - sx, my = activeTouch.clientY - sy;
-    const ln = Math.sqrt(mx * mx + my * my);
-    if (ln > maxR) { mx = mx / ln * maxR; my = my / ln * maxR; }
-    knob.style.transform = `translate(${mx}px,${my}px)`;
-    mob.dx = mx / maxR;
-    mob.dy = my / maxR;
-    e.preventDefault();
+  window.addEventListener('touchstart', e => {
+    SFX.res();
+    if(gs === 'menu') return;
+    
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      
+      if (t.clientX < window.innerWidth / 2) {
+        // Left Side: Floating Joystick
+        if (moveTouchId !== null) continue;
+        moveTouchId = t.identifier;
+        mob.on = true;
+        
+        zone.style.left = `${t.clientX - 65}px`;
+        zone.style.top = `${t.clientY - 65}px`;
+        zone.style.transform = 'none';
+        zone.style.display = 'block';
+        setTimeout(() => { zone.style.opacity = '1'; }, 10);
+        
+        sx = t.clientX;
+        sy = t.clientY;
+      } else {
+        // Right Side: Action Gestures or direct tap pass
+        if (rightTouchId !== null) continue;
+        
+        // Check if direct teammate tap pass
+        const gCoords = getGameCoords(t.clientX, t.clientY);
+        const teammate = findTappedPlayer(gCoords.x, gCoords.y, 0);
+        if (teammate && human && ball.own === human.id) {
+          doPass(human, teammate);
+          SFX.select();
+          continue;
+        }
+        
+        rightTouchId = t.identifier;
+        rx = t.clientX;
+        ry = t.clientY;
+        rightTouchTime = Date.now();
+        isAimingShot = false;
+        
+        setTimeout(() => {
+          if (rightTouchId === t.identifier && !isAimingShot) {
+            isAimingShot = true;
+            if (human && ball.own === human.id) {
+              keys['ShiftLeft'] = true;
+              document.getElementById('pwrMtr').style.visibility = 'visible';
+              shotAimX = human.team === 0 ? F.x + F.w : F.x;
+              shotAimY = F.y + F.h / 2;
+            }
+          }
+        }, 150);
+      }
+    }
+  }, {passive: false});
+
+  window.addEventListener('touchmove', e => {
+    if(gs === 'menu') return;
+    
+    for (let i = 0; i < e.touches.length; i++) {
+      const t = e.touches[i];
+      
+      if (t.identifier === moveTouchId) {
+        let mx = t.clientX - sx, my = t.clientY - sy;
+        const ln = Math.hypot(mx, my);
+        if (ln > maxR) { mx = mx / ln * maxR; my = my / ln * maxR; }
+        knob.style.transform = `translate(${mx}px,${my}px)`;
+        
+        mob.dx = mx / maxR;
+        mob.dy = my / maxR;
+        
+        // Slide to sprint
+        if (ln > maxR * 0.9) sprintMob = true;
+        else sprintMob = false;
+      }
+      
+      if (t.identifier === rightTouchId && isAimingShot && human) {
+        let dy = t.clientY - ry;
+        const sensitivity = 2.2;
+        const direction = (sidesSwitched && gs !== 'penalty') ? -1 : 1;
+        
+        const topPost = F.y + F.h / 2 - F.goalH / 2;
+        const bottomPost = F.y + F.h / 2 + F.goalH / 2;
+        shotAimY = clamp(shotAimY + dy * sensitivity * direction, topPost + 6, bottomPost - 6);
+        ry = t.clientY;
+      }
+    }
   }, {passive: false});
 
   const rst = (e) => {
-    // Only reset movement if the finger that left was the movement finger
-    if (moveTouchId !== null) {
-      let matchingTouch = false;
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        if (e.changedTouches[i].identifier === moveTouchId) matchingTouch = true;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      
+      if (t.identifier === moveTouchId) {
+        mob.on = false;
+        mob.dx = 0;
+        mob.dy = 0;
+        sprintMob = false;
+        moveTouchId = null;
+        knob.style.transform = 'translate(0,0)';
+        zone.style.opacity = '0';
+        setTimeout(() => { if (!mob.on) zone.style.display = 'none'; }, 150);
       }
-      if (!matchingTouch) return;
-    }
-    mob.on = false;
-    mob.dx = 0;
-    mob.dy = 0;
-    moveTouchId = null;
-    knob.style.transform = 'translate(0,0)';
-  };
-  zone.addEventListener('touchend', rst);
-  zone.addEventListener('touchcancel', rst);
-
-
-  function mb2(id,dn,up){
-    const el=document.getElementById(id);if(!el)return;
-    el.addEventListener('touchstart',e=>{dn();el.classList.add('on');e.preventDefault();},{passive:false});
-    el.addEventListener('touchend',()=>{up();el.classList.remove('on');});
-    el.addEventListener('touchcancel',()=>{up();el.classList.remove('on');});
-  }
-  mb2('mPas',()=>keys['Space']=true,()=>delete keys['Space']);
-  mb2('mSht',
-    ()=>{keys['ShiftLeft']=true;document.getElementById('pwrMtr').style.visibility='visible';},
-    ()=>{delete keys['ShiftLeft'];document.getElementById('pwrMtr').style.visibility='hidden';}
-  );
-  const mSht = document.getElementById("mSht");
-  let lastShtTouchY = 0;
-  let shootTouchId = null;
-
-  mSht.addEventListener('touchstart', e => {
-    keys['ShiftLeft'] = true;
-    document.getElementById('pwrMtr').style.visibility = 'visible';
-    mSht.classList.add('on');
-    
-    // Bind the shoot tracker to its own independent touch footprint identifier
-    const touch = e.changedTouches[0];
-    shootTouchId = touch.identifier;
-    lastShtTouchY = touch.clientY;
-    
-    if (human && !shtHeld) {
-      shotAimX = human.team === 0 ? F.x + F.w : F.x;
-      shotAimY = F.y + F.h / 2; 
-    }
-    e.preventDefault();
-  }, {passive: false});
-
-    // --- TARGET AIMING FIX INSIDE initMobile() ---
-    // --- TARGET AIMING PERSPECTIVE FIX INSIDE initMobile() ---
-  mSht.addEventListener("touchmove", e => {
-    if (!human) return;
-    
-    // Find the touch interaction strictly tied to the target aiming system
-    let activeTouch = null;
-    for (let i = 0; i < e.touches.length; i++) {
-      if (e.touches[i].identifier === shootTouchId) {
-        activeTouch = e.touches[i];
-        break;
+      
+      if (t.identifier === rightTouchId) {
+        const duration = Date.now() - rightTouchTime;
+        const dx = t.clientX - rx;
+        const dy = t.clientY - ry;
+        const dist = Math.hypot(dx, dy);
+        
+        rightTouchId = null;
+        
+        if (isAimingShot) {
+          isAimingShot = false;
+          delete keys['ShiftLeft'];
+          document.getElementById('pwrMtr').style.visibility = 'hidden';
+        } else {
+          if (dist > 30 && duration < 300) {
+            // Swipe to shoot
+            if (human && ball.own === human.id) {
+              const angle = Math.atan2(dy, dx);
+              const goalX = human.team === 0 ? F.x + F.w : F.x;
+              const distToGoal = Math.abs(goalX - human.x);
+              shotAimX = goalX;
+              
+              const direction = (sidesSwitched && gs !== 'penalty') ? -1 : 1;
+              shotAimY = clamp(human.y + Math.tan(angle) * distToGoal * direction, F.y + F.h/2 - F.goalH/2 + 6, F.y + F.h/2 + F.goalH/2 - 6);
+              doShoot(human, 0.82);
+            }
+          } else {
+            // Tap to pass/tackle
+            keys['Space'] = true;
+            setTimeout(() => delete keys['Space'], 50);
+          }
+        }
       }
     }
-    if (!activeTouch) return;
-
-    const currentTouchY = activeTouch.clientY;
-    let deltaY = currentTouchY - lastShtTouchY;
-    
-    // FIX: Reverse the sliding math dynamically if the perspective flipped at halftime
-    if (sidesSwitched && gs !== 'penalty') {
-      deltaY = -deltaY;
-    }
-    
-    const sensitivity = 1.5; 
-    shotAimY += deltaY * sensitivity;
-    
-    const topPost = F.y + F.h / 2 - F.goalH / 2;
-    const bottomPost = F.y + F.h / 2 + F.goalH / 2;
-    shotAimY = clamp(shotAimY, topPost + 6, bottomPost - 6);
-    
-    lastShtTouchY = currentTouchY;
-    e.preventDefault();
-  }, {passive: false});
-
-
-
-  const releaseShoot = (e) => {
-    if (shootTouchId !== null) {
-      let matchingTouch = false;
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        if (e.changedTouches[i].identifier === shootTouchId) matchingTouch = true;
-      }
-      if (!matchingTouch) return; 
-    }
-    delete keys['ShiftLeft'];
-    document.getElementById('pwrMtr').style.visibility = 'hidden';
-    mSht.classList.remove('on');
-    shootTouchId = null;
   };
 
-  mSht.addEventListener('touchend', releaseShoot);
-  mSht.addEventListener('touchcancel', releaseShoot);
-
- 
-  
-  mb2('mSpr',()=>sprintMob=true,()=>sprintMob=false);
-  mb2('mCyc',()=>{pTgtIdx=(pTgtIdx+1)%Math.max(1,pTargets.length);SFX.select();},()=>{});
+  window.addEventListener('touchend', rst);
+  window.addEventListener('touchcancel', rst);
 
   window.addEventListener('touchstart',()=>{
     if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{});
@@ -2786,7 +2873,6 @@ function initMobile(){
     if(SFX.on) BGM.start();
   },{once:true,passive:true});
 }
-
 // ═══════════════════════════════════════════════════════
 // GAME PLAY LOOP
 // ═══════════════════════════════════════════════════════
@@ -3013,7 +3099,7 @@ function update(dt){
       }
     });
 
-    handleColl();constrPlayers();updLeads();updBall();aiTkl();tickP();tickSta();tickCM();
+    handleColl();constrPlayers();updLeads();updBall();aiTkl();tickP();tickSta();tickCM();updateCrowdDynamic();
   }
 }
 
