@@ -274,14 +274,6 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
 /* Responsive */
 @media(max-width:1024px){
   #mOvl{display:block!important} /* Assures interface overlays remain drawn when tweaking values */
-  #gameCanvas{
-    position:fixed!important;
-    width:calc(100vw - 250px)!important;
-    height:100vh!important;
-    left:100px!important;
-    top:0!important;
-    bottom:20px!important;
-  }
   .btn{min-width:200px;padding:11px 20px;font-size:13px}
 }
 
@@ -960,14 +952,9 @@ const cx=cv.getContext('2d');
 cv.width=W;cv.height=H;
 
 function resizeCv(){
-  if(window.innerWidth<=1024){
-    cv.style.cssText='position:fixed;width:calc(100vw - 300px);height:100vh;left:150px;top:0';
-  }else{
-    const r=W/H;let w=window.innerWidth,h=window.innerHeight;
-
-    if(w/h>r)w=h*r;else h=w/r;
-    cv.style.cssText=`position:fixed;width:${w}px;height:${h}px;left:${(window.innerWidth-w)/2}px;top:${(window.innerHeight-h)/2}px`;
-  }
+  const r=W/H;let w=window.innerWidth,h=window.innerHeight;
+  if(w/h>r)w=h*r;else h=w/r;
+  cv.style.cssText=`position:fixed;width:${w}px;height:${h}px;left:${(window.innerWidth-w)/2}px;top:${(window.innerHeight-h)/2}px`;
 }
 window.addEventListener('resize',()=>{resizeCv();checkOri()});
 resizeCv();
