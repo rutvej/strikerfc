@@ -4,7 +4,8 @@ const ASSETS = [
   './index.html',
   './manifest.json',
   './icon.png',
-  './icon.jpg'
+  './icon.jpg',
+  'https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js'
 ];
 
 // Install Service Worker and Cache Assets
