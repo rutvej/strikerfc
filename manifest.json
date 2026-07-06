@@ -1,0 +1,22 @@
+{
+  "name": "STRKER FC — Football",
+  "short_name": "StrikerFC",
+  "description": "Futuristic football game with instant local tournaments, adaptive AI, and real-time WebRTC multiplayer.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0A0F1A",
+  "theme_color": "#F4A261",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icon.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}

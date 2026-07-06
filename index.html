@@ -3,8 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<meta name="theme-color" content="#0A0F1A">
 <title>STRKER — Football</title>
+<link rel="manifest" href="manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Russo One&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
 <style>
 #exitBtn{
     position:fixed;
@@ -216,6 +219,9 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
 #rotMsg .ri{font-size:50px;animation:rot 1.8s ease-in-out infinite alternate}
 @keyframes rot{from{transform:rotate(0)}to{transform:rotate(90deg)}}
 #rotMsg p{font-family:'Russo One',sans-serif;font-size:17px;color:var(--accent);letter-spacing:2px}
+.diff-btn{padding:6px 10px; min-width:65px; border-color:var(--border); background:var(--card); font-size:11px; cursor:pointer; border-radius:6px; font-weight:600; transition:all 0.2s;}
+.diff-btn:hover{border-color:var(--accent); background:rgba(244,162,97,.05);}
+.diff-btn.active{border-color:var(--accent); color:var(--accent); background:rgba(244,162,97,.15); box-shadow:0 0 10px rgba(244,162,97,.25);}
 </style>
 </head>
 <body>
@@ -323,6 +329,16 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
   <button class="btn btn-p" onclick="goTeamSel('single')">⚽ SINGLE PLAYER</button>
   <button class="btn" onclick="goTeamSel('tournament')">🏆 TOURNAMENT</button>
   <button class="btn" onclick="showTraining()">🧪 TRAINING</button>
+  <button class="btn" id="pwaInstallBtn" onclick="triggerPwaInstall()" style="display:none; border-color:#06D6A0; color:#06D6A0; box-shadow: 0 0 12px rgba(6,214,160,.2);">📲 INSTALL APP</button>
+  <div style="margin: 15px 0 10px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+    <label style="font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px;">AI Difficulty</label>
+    <div style="display: flex; gap: 5px;">
+      <button class="btn btn-sm diff-btn" id="diffBtn_easy" onclick="setDifficulty('easy')">EASY</button>
+      <button class="btn btn-sm diff-btn" id="diffBtn_medium" onclick="setDifficulty('medium')">MEDIUM</button>
+      <button class="btn btn-sm diff-btn active" id="diffBtn_hard" onclick="setDifficulty('hard')">HARD</button>
+      <button class="btn btn-sm diff-btn" id="diffBtn_legend" onclick="setDifficulty('legend')">LEGEND</button>
+    </div>
+  </div>
   <button class="btn" onclick="showSig('host')">➕ CREATE MATCH</button>
   <button class="btn" onclick="showSig('guest')">🔗 JOIN MATCH</button>
   <div class="ctrl">
@@ -361,9 +377,12 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
     <h2 id="sigTitle">Create Match</h2>
     <p id="sigDesc">Share your code with your opponent.</p>
     <div class="sig-step" id="stepOffer">
-      <label id="lblOffer">Your Match Code</label>
+      <label id="lblOffer">Your Room Code</label>
       <textarea id="txtOffer" readonly placeholder="Generating..."></textarea>
-      <button class="btn btn-sm" style="margin-top:6px" onclick="copyCode('txtOffer')">📋 COPY</button>
+      <div style="display:flex; gap:6px; margin-top:6px;">
+        <button class="btn btn-sm" onclick="copyCode('txtOffer')">📋 COPY CODE</button>
+        <button class="btn btn-sm" id="btnCopyLink" style="display:none;" onclick="copyInviteLink()">🔗 COPY LINK</button>
+      </div>
     </div>
     <div class="sig-step" id="stepAns" style="display:none">
       <label id="lblAns">Opponent's Code</label>
@@ -460,6 +479,13 @@ const TEAMS=[
 // Helper to quickly grab the active stats for Team 1 or Team 2
 const getSt = t => t === 0 ? CFG.t1st : CFG.t2st;
 
+let aiDifficulty = 'hard';
+const DIFFICULTY_CONFIGS = {
+  easy:   { speedMult: 0.75, decisionRate: 0.2, tackleChance: 0.015, gkAware: 0.5 },
+  medium: { speedMult: 0.90, decisionRate: 0.5, tackleChance: 0.025, gkAware: 0.8 },
+  hard:   { speedMult: 1.05, decisionRate: 0.8, tackleChance: 0.035, gkAware: 1.1 },
+  legend: { speedMult: 1.25, decisionRate: 1.0, tackleChance: 0.055, gkAware: 1.5 }
+};
 
 let CFG={
   pR:15,bR:6,pSpd:2.8,gkSpd:2.4,passSpd:6.5,shootSpd:10,
@@ -1107,18 +1133,20 @@ function createTeams(rst=true){
   ball={x:F.x+F.w/2,y:F.y+F.h/2,vx:0,vy:0,own:-1,lt:-1};
   if(rst){score=[0,0];matchTime=0;mSt={shots:[0,0],passes:[0,0],tackles:[0,0]};halfFired=false;koTeam=0;sidesSwitched=false;pen={active:false}; resetTacMem();}
   
-  
   parts=[];bTrail=[];
-    for(let t=0;t<2;t++){
+  for(let t=0;t<2;t++){
     if(gMode === 'training' && trnMode === 'single_team' && t === 1) continue; 
     FORM.forEach((f,i)=>{
       const rx=t===0?f.rx:1-f.rx;
       const hx=F.x+rx*F.w,hy=F.y+f.ry*F.h;
       const st = getSt(t);
-      players.push({id:t*CFG.tSz+i,team:t,role:f.role,x:hx,y:hy,hx,hy,vx:0,vy:0,angle:t===0?0:Math.PI,speed:f.role==='gk'?(CFG.gkSpd*st.gk):(CFG.pSpd*st.spd),num:i+1,lead:false,sta:1});
+      let baseSpeed = f.role==='gk'?(CFG.gkSpd*st.gk):(CFG.pSpd*st.spd);
+      if (t === 1 && !isMulti && gMode !== 'training') {
+        baseSpeed *= DIFFICULTY_CONFIGS[aiDifficulty].speedMult;
+      }
+      players.push({id:t*CFG.tSz+i,team:t,role:f.role,x:hx,y:hy,hx,hy,vx:0,vy:0,angle:t===0?0:Math.PI,speed:baseSpeed,num:i+1,lead:false,sta:1,walkPhase:0});
     });
   }
-
 }
 const gT=t=>players.filter(p=>p.team===t);
 function cToBall(ti){let b=null,d=Infinity;gT(ti).forEach(p=>{const dd=dst(p.x,p.y,ball.x,ball.y);if(dd<d){d=dd;b=p;}});return b;}
@@ -1311,9 +1339,10 @@ function attemptTkl(tkl){
   const d=dst(tkl.x,tkl.y,car.x,car.y);if(d>CFG.tklD)return;
   const dx=car.x-tkl.x,dy=car.y-tkl.y;
   if(tkl.vx*dx+tkl.vy*dy<=0)return;
-    if(rnd() < .55 * getSt(tkl.team).def){
+  if(rnd() < .55 * getSt(tkl.team).def){
     ball.own=-1;ball.lt=-1;
     ball.vx=(dx/Math.max(1,d))*2;ball.vy=(dy/Math.max(1,d))*2;
+    ball.relBy=car.id;ball.relT=40;
     for(let i=0;i<6;i++)parts.push(mkP(car.x,car.y,'rgba(255,200,50,.8)',2));
     SFX.tackle();mSt.tackles[tkl.team]++;trigCM('tackle');prof.prLost++;
   }else{tkl.vx=-(dx/Math.max(1,d))*1.5;tkl.vy=-(dy/Math.max(1,d))*1.5;prof.prSurv++;}
@@ -1460,7 +1489,8 @@ function aiGK(p,opps){
       const a=Math.atan2(ball.y-p.y,ball.x-p.x);p.vx=Math.cos(a)*p.speed*1.2;p.vy=Math.sin(a)*p.speed*1.2;p.angle=a;return;
     }
   }
-  const rD=90+ad.gkAware*25;
+  const diffConfig = DIFFICULTY_CONFIGS[aiDifficulty];
+  const rD = (90 + ad.gkAware * 25) * (!isMulti ? diffConfig.gkAware : 1.0);
   if(dB<rD&&ball.own!==p.id&&bToG(p.team)){
     const a=Math.atan2(ball.y-p.y,ball.x-p.x);p.vx=Math.cos(a)*p.speed*1.5;p.vy=Math.sin(a)*p.speed*1.5;p.angle=a;
     if(dB<30&&ball.own<0){ball.own=p.id;ball.lt=p.team;SFX.save();mSt.tackles[p.team]++;trigCM('save');}
@@ -1747,7 +1777,9 @@ function aiTkl(){
     const d = dst(primaryPresser.x, primaryPresser.y, car.x, car.y);
     if (d < CFG.tklD) {
       const dx = car.x - primaryPresser.x, dy = car.y - primaryPresser.y;
-      if (primaryPresser.vx * dx + primaryPresser.vy * dy > 0 && rnd() < .03 * ad.press) {
+      const diffConfig = DIFFICULTY_CONFIGS[aiDifficulty];
+      const tackleChance = !isMulti ? diffConfig.tackleChance : 0.03;
+      if (primaryPresser.vx * dx + primaryPresser.vy * dy > 0 && rnd() < tackleChance * ad.press) {
         if (rnd() < .45) { 
           ball.own = -1; ball.lt = -1;
           ball.vx = (dx / Math.max(1, d)) * 3.5; ball.vy = (dy / Math.max(1, d)) * 3.5;
@@ -1919,7 +1951,7 @@ function drawPlayer(p){
   // Legs
   const lW=r*.27,lH=r*.32,lSp=bW*.48,lY=bH*.55;
   const sp2=Math.sqrt(p.vx**2+p.vy**2);
-  const wPh=sp2>.3?(Date.now()/90)*(sp2/CFG.pSpd):0;
+  const wPh=p.walkPhase||0;
   const lSw=sp2>.3?Math.sin(wPh)*.35:0;
   [[-lSp,-lSw],[lSp,lSw]].forEach(([lx,ls])=>{
     cx.save();cx.translate(lx,lY);cx.rotate(ls);
@@ -2087,69 +2119,96 @@ function rRect(c,x,y,w,h,r){
 // ═══════════════════════════════════════════════════════
 let snapshotSeq=0;
 let lastSnapshot=-1;
+let conn=null;
+let netAccum=0;
+let gIn={u:false,d:false,l:false,r:false,pass:false,shoot:false,sprint:false};
 
-let snapBuffer=[];
+function setupPeerEvents() {
+  conn.on('open', () => {
+    connected();
+  });
+  conn.on('data', data => {
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    if (isHost) {
+      if (parsed.t === 'i') onInput(parsed);
+    } else {
+      onEvent(parsed);
+    }
+  });
+  conn.on('close', disconnect);
+  conn.on('error', disconnect);
+}
 
-const SNAP_DELAY=100;   // ms
-let peer=null;  let inputChan=null;   // unreliable
-  let eventChan=null;   // reliable  
-  let netAccum=0;
-let gIn={u:false,d:false,l:false,r:false,pass:false,shoot:false};
-
-function waitICE(p2){
-  return new Promise(res=>{
-    if(p2.iceGatheringState==='complete'){res();return;}
-    const to=setTimeout(res,10000);
-    p2.addEventListener('icegatheringstatechange',()=>{if(p2.iceGatheringState==='complete'){clearTimeout(to);res();}});
+function initPeerHost() {
+  const roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
+  document.getElementById('txtOffer').value = roomId;
+  document.getElementById('btnCopyLink').style.display = 'inline-flex';
+  setSt('wait', 'Creating room on cloud...');
+  
+  isHost = true;
+  peer = new Peer('STRKER-' + roomId);
+  
+  peer.on('open', () => {
+    setSt('wait', 'Room Active! Share room code or copy link to play.');
+  });
+  peer.on('connection', c => {
+    conn = c;
+    setupPeerEvents();
+  });
+  peer.on('error', err => {
+    console.error(err);
+    if (err.type === 'unavailable-id') {
+      initPeerHost();
+    } else {
+      setSt('err', 'Network Error: ' + err.message);
+    }
   });
 }
-function setupInputDC(ch){
-    ch.onopen=()=>{
-        if(eventChan?.readyState==="open"){
-            connected();
-        }
-    };
-    ch.onmessage=e=>{
-        onInput(JSON.parse(e.data));
-    };
-    ch.onclose=disconnect;
+
+function initPeerGuest(roomId) {
+  roomId = roomId.trim().toUpperCase();
+  setSt('wait', 'Connecting to room: ' + roomId + '...');
+  
+  isHost = false;
+  peer = new Peer();
+  
+  peer.on('open', () => {
+    conn = peer.connect('STRKER-' + roomId, { reliable: true });
+    setupPeerEvents();
+  });
+  peer.on('error', err => {
+    console.error(err);
+    setSt('err', 'Failed to connect: ' + err.message);
+  });
 }
-function setupEventDC(ch){
-    ch.onopen=()=>{
-        if(inputChan?.readyState==="open"){
-            connected();
-        }
-        sendTeamSelection();
-    };
-    ch.onmessage=e=>{
-        onEvent(JSON.parse(e.data));
-    };
-    ch.onclose=disconnect;
-}
+
 function sendTeamSelection(){
   if(!netRole||netTeams[netRole]===null)return;
   sendEvent({t:'team',role:netRole,team:netTeams[netRole]});
 }
+
 function tryNetStart(){
   if(netMatchStarted)return;
-  if(!inputChan||inputChan.readyState!=='open')return;
-  if(!eventChan||eventChan.readyState!=='open')return;
+  if(!conn||!conn.open)return;
   if(netTeams.host===null||netTeams.guest===null)return;
   netMatchStarted=true;
-  setSt('conn','Teams ready. Starting...');
+  setSt('conn','Teams ready! Starting match...');
   setTimeout(beginMatch,400);
 }
+
 function connected(){
-    setSt('conn','Connected! Waiting for team sync...');
-    setTimeout(tryNetStart,400);
+  setSt('conn','Connected! Exchanging team choices...');
+  sendTeamSelection();
 }
 
 function disconnect(){
-    if(gs==="playing"||gs==="goal"){
-        toast("Opponent disconnected");
-        gs="ended";
-    }
+  if(gs==="playing"||gs==="goal"||gs==="kickoff"){
+    toast("Opponent disconnected");
+    gs="ended";
+    showEnd();
+  }
 }
+
 function prepareNetMatch(mode){
   netRole=mode;
   gMode='network';
@@ -2162,134 +2221,126 @@ function prepareNetMatch(mode){
   buildTeamGrid();
   showScr('teamScreen');
 }
+
+function copyInviteLink() {
+  const code = document.getElementById('txtOffer').value.trim();
+  if (!code || code.startsWith('Generating')) return;
+  const url = `${window.location.origin}${window.location.pathname}?join=${code}`;
+  navigator.clipboard.writeText(url).then(() => toast('Invite Link Copied!'));
+}
+
 function showSig(mode){
   isMulti=true;netRole=mode;hideScr('menuScreen');showScr('signalScreen');
-  document.getElementById('stepAns').style.display='none';
   document.getElementById('sigSt').className='sig-st';
   const btn=document.getElementById('btnSigAct');
+  
+  if (peer) { try { peer.destroy(); } catch(e){} peer = null; }
+  if (conn) { try { conn.close(); } catch(e){} conn = null; }
+  netMatchStarted = false;
+  
   if(mode==='host'){
-    document.getElementById('sigTitle').textContent='Create Match';document.getElementById('sigDesc').textContent='Copy your code and send it to your opponent.';
-    document.getElementById('lblOffer').textContent='Your Match Code';document.getElementById('txtOffer').value='Generating...';
-    btn.textContent='🔗 CONNECT';btn.onclick=hostAns;mkOffer();
+    document.getElementById('sigTitle').textContent='Create Match';
+    document.getElementById('sigDesc').textContent='Share this Room Code or Invite Link with your opponent.';
+    document.getElementById('lblOffer').textContent='Your Room Code';
+    document.getElementById('txtOffer').value='Generating Room...';
+    document.getElementById('stepAns').style.display='none';
+    btn.style.display='none';
+    document.getElementById('btnCopyLink').style.display = 'none';
+    
+    initPeerHost();
   }else{
-    document.getElementById('sigTitle').textContent='Join Match';document.getElementById('sigDesc').textContent='Paste host code then share yours back.';
-    document.getElementById('lblOffer').textContent='Your Code';document.getElementById('txtOffer').value='...';
-    document.getElementById('stepAns').style.display='block';document.getElementById('lblAns').textContent="Host's Code";
-    document.getElementById('txtAns').value='';btn.textContent='🔗 GENERATE CODE';btn.onclick=guestAns;
+    document.getElementById('sigTitle').textContent='Join Match';
+    document.getElementById('sigDesc').textContent='Enter Host\'s Room Code to connect.';
+    document.getElementById('lblOffer').textContent='Your Code';
+    document.getElementById('stepOffer').style.display='none';
+    document.getElementById('stepAns').style.display='block';
+    document.getElementById('lblAns').textContent="Host's Room Code";
+    document.getElementById('txtAns').value='';
+    document.getElementById('txtAns').placeholder='e.g. ABCDE';
+    btn.style.display='inline-flex';
+    btn.textContent='🔗 JOIN ROOM';
+    btn.onclick=() => {
+      const val = document.getElementById('txtAns').value.trim();
+      if(!val){toast('Enter room code first');return;}
+      initPeerGuest(val);
+    };
   }
 }
-async function mkOffer(){
-  try{
-    isHost=true;peer=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]});
-    inputChan=peer.createDataChannel("input",{
-    ordered:false,
-    maxRetransmits:0
-});
 
-eventChan=peer.createDataChannel("event",{
-    ordered:true
-});
-
-setupInputDC(inputChan);
-setupEventDC(eventChan);
-    const off=await peer.createOffer();await peer.setLocalDescription(off);
-    setSt('wait','Gathering...');await waitICE(peer);
-    document.getElementById('txtOffer').value=btoa(JSON.stringify(peer.localDescription));
-    setSt('wait','Code ready! Share it, then paste theirs.');
-    document.getElementById('stepAns').style.display='block';document.getElementById('txtAns').value='';
-  }catch(e){setSt('err','Failed: '+e.message);}
-}
-async function hostAns(){
-  const ans=document.getElementById('txtAns').value.trim();
-  if(!ans){toast('Paste opponent code first');return;}
-  try{await peer.setRemoteDescription(JSON.parse(atob(ans)));setSt('wait','Connecting...');}
-  catch(e){setSt('err','Invalid code: '+e.message);}
-}
-async function guestAns(){
-  const off=document.getElementById('txtAns').value.trim();
-  if(!off){toast('Paste host code first');return;}
-  try{
-    isHost=false;peer=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]});
-    peer.ondatachannel=e=>{
-
-    if(e.channel.label==="input"){
-        inputChan=e.channel;
-        setupInputDC(inputChan);
-    }
-
-    if(e.channel.label==="event"){
-        eventChan=e.channel;
-        setupEventDC(eventChan);
-    }
-
-};
-    await peer.setRemoteDescription(JSON.parse(atob(off)));
-    const ans=await peer.createAnswer();await peer.setLocalDescription(ans);
-    setSt('wait','Generating...');await waitICE(peer);
-    document.getElementById('txtOffer').value=btoa(JSON.stringify(peer.localDescription));
-    document.getElementById('txtOffer').readOnly=false;
-    setSt('wait','Share your code. Waiting...');document.getElementById('btnSigAct').style.display='none';
-  }catch(e){setSt('err','Failed: '+e.message);}
-}
 function setSt(c,m){const el=document.getElementById('sigSt');el.className='sig-st '+c;el.textContent=m;}
+
 function sndNet(data){
-    if(isHost){
-        if(eventChan?.readyState==='open'){
-            eventChan.send(JSON.stringify(data));
-        }
-    } else {
-        if(inputChan?.readyState==='open'){
-            inputChan.send(JSON.stringify(data));
-        }
-    }
+  if(conn&&conn.open){
+    conn.send(JSON.stringify(data));
+  }
 }
 function sendInput(data){
-    if(inputChan?.readyState===true||inputChan?.readyState==='open'){
-        inputChan.send(JSON.stringify(data));
-    }
+  if(conn&&conn.open){
+    conn.send(JSON.stringify(data));
+  }
 }
 function sendEvent(data){
-    if(eventChan?.readyState===true||eventChan?.readyState==='open'){
-        eventChan.send(JSON.stringify(data));
-    }
+  if(conn&&conn.open){
+    conn.send(JSON.stringify(data));
+  }
 }
+
 function onInput(d){
-
-    if(isHost){
-
-        if(d.t==="i"){
-            gIn=d.k;
-        }
-
+  if(isHost){
+    if(d.t==="i"){
+      gIn=d.k;
     }
-
+  }
 }
 
 function onEvent(d){
-    if(d.t==='team'){
-        if(d.role==='host') netTeams.host=d.team;
-        if(d.role==='guest') netTeams.guest=d.team;
-        tryNetStart();
-        return;
-    }
-    if(d.t==='s'&&!isHost){
-        if(d.seq<=lastSnapshot) return;
-        lastSnapshot=d.seq;
-        snapBuffer.push(d);
-        if(snapBuffer.length>20) snapBuffer.shift();
-        return;
-    }
+  if(d.t==='team'){
+    if(d.role==='host') netTeams.host=d.team;
+    if(d.role==='guest') netTeams.guest=d.team;
+    tryNetStart();
+    return;
+  }
+  if(d.t==='s'&&!isHost){
+    if(d.seq<=lastSnapshot) return;
+    lastSnapshot=d.seq;
+    applySnapshot(d);
+    return;
+  }
 }
+
+function applySnapshot(snap) {
+  if (!snap || !snap.s) return;
+  const s = snap.s;
+  
+  gs = s.gs;
+  score = [...s.sc];
+  matchTime = s.mt;
+  
+  if (s.p && s.p.length === players.length) {
+    for (let i = 0; i < players.length; i++) {
+      players[i].x = s.p[i].x;
+      players[i].y = s.p[i].y;
+      players[i].angle = s.p[i].a;
+      players[i].lead = s.p[i].l;
+    }
+  }
+  
+  if (s.b) {
+    ball.x = s.b.x;
+    ball.y = s.b.y;
+    ball.vx = s.b.vx;
+    ball.vy = s.b.vy;
+    ball.own = s.b.o;
+    ball.lt = s.b.lt;
+  }
+}
+
 function serSt(){
   return{
     t:'s',
-
     seq:++snapshotSeq,
-
     tick:Math.floor(matchTime*60),
-
     ts:performance.now(),
-
     s:{
         p:players.map(p=>({
             x:p.x,
@@ -2297,7 +2348,6 @@ function serSt(){
             a:p.angle,
             l:p.lead
         })),
-
         b:{
             x:ball.x,
             y:ball.y,
@@ -2306,14 +2356,11 @@ function serSt(){
             o:ball.own,
             lt:ball.lt
         },
-
         sc:[...score],
-
         mt:matchTime,
-
         gs
     }
-};
+  };
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2542,7 +2589,21 @@ function gameLoop(ts){
   if(isHost&&isMulti){netAccum+=dt;if(netAccum>=1/30){netAccum=0;sndNet(serSt());}}
   if(!isHost&&isMulti){
     netAccum+=dt;
-    if(netAccum>=1/30){netAccum=0;sndNet({t:'i',k:{u:!!keys['KeyW']||!!keys['ArrowUp'],d:!!keys['KeyS']||!!keys['ArrowDown'],l:!!keys['KeyA']||!!keys['ArrowLeft'],r:!!keys['KeyD']||!!keys['ArrowRight'],pass:!!keys['Space'],shoot:!!(keys['ShiftLeft']||keys['ShiftRight'])}});}
+    if(netAccum>=1/30){
+      netAccum=0;
+      sndNet({
+        t:'i',
+        k:{
+          u:!!keys['KeyW']||!!keys['ArrowUp'],
+          d:!!keys['KeyS']||!!keys['ArrowDown'],
+          l:!!keys['KeyA']||!!keys['ArrowLeft'],
+          r:!!keys['KeyD']||!!keys['ArrowRight'],
+          pass:!!keys['Space'],
+          shoot:!!(keys['ShiftLeft']||keys['ShiftRight']),
+          sprint:!!(keys['ShiftLeft']||keys['ShiftRight']||sprintMob)
+        }
+      });
+    }
   }
   render();requestAnimationFrame(gameLoop);
 }
@@ -2569,6 +2630,15 @@ function setupPen() {
 
 function update(dt){
   if(gs==='kickoff'){koTimer--;if(koTimer<=0)gs='playing';}
+
+  if (isMulti && !isHost) {
+    if (gs === 'playing') {
+      matchTime += dt;
+      tickP();
+      tickCM();
+    }
+    return;
+  }
 
   if(gs==='goal'){
     goalTimer--;tickP();
@@ -2669,6 +2739,8 @@ function update(dt){
     
     if(isHost && !(gMode === 'training' && trnMode === 'ai_vs_ai')){
         human=selHuman(0);updPTargets(human);procHuman(human);
+    } else if(!isHost && isMulti) {
+        human=selHuman(1);updPTargets(human);
     } else {
         human = null;
     }
@@ -2678,7 +2750,11 @@ function update(dt){
       if(gp){
         let dx=0,dy=0;if(gIn.u)dy=-1;if(gIn.d)dy=1;if(gIn.l)dx=-1;if(gIn.r)dx=1;
         if(dx||dy){const m=Math.sqrt(dx*dx+dy*dy);dx/=m;dy/=m;}
-        gp.vx=dx*gp.speed;gp.vy=dy*gp.speed;if(dx||dy)gp.angle=Math.atan2(dy,dx);
+        const hb = ball.own === gp.id;
+        const spr = gIn.sprint && !hb;
+        const individualMod = spr ? 1.42 : 1.0;
+        const spd = gp.speed * individualMod;
+        gp.vx=dx*spd;gp.vy=dy*spd;if(dx||dy)gp.angle=Math.atan2(dy,dx);
         if(gIn.pass&&!gIn._p){if(ball.own===gp.id){if(gp.role==='gk')gkClear(gp);else doPass(gp);}else attemptTkl(gp);}
         gIn._p=gIn.pass;
         if(gIn.shoot&&!gIn._s){if(ball.own===gp.id)doShoot(gp,.85);}gIn._s=gIn.shoot;
@@ -2704,6 +2780,10 @@ function update(dt){
       }
 
       p.x += p.vx; p.y += p.vy;
+      const speedVal = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+      if (speedVal > 0.3) {
+        p.walkPhase = (p.walkPhase || 0) + (speedVal / CFG.pSpd) * dt * 12;
+      }
       const ctrl = (human && p.id === human.id) || (gpRef && p.id === gpRef.id);
       if (!ctrl) {
         const trackingAttack = (ball.own >= 0 && players[ball.own]?.team === p.team);
@@ -2786,12 +2866,40 @@ function selectTrnType(type) {
 // ═══════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════
+function checkUrlJoin() {
+  const params = new URLSearchParams(window.location.search);
+  const joinCode = params.get('join');
+  if (joinCode) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+    isMulti = true;
+    netRole = 'guest';
+    hideScr('menuScreen');
+    showScr('signalScreen');
+    
+    document.getElementById('sigTitle').textContent = 'Connecting...';
+    document.getElementById('sigDesc').textContent = `Connecting to room: ${joinCode.toUpperCase()}`;
+    document.getElementById('stepOffer').style.display = 'none';
+    document.getElementById('stepAns').style.display = 'none';
+    document.getElementById('btnSigAct').style.display = 'none';
+    
+    initPeerGuest(joinCode);
+  }
+}
+
 function init(){
   showScr('menuScreen');['signalScreen','endScreen','teamScreen','tournamentScreen'].forEach(hideScr);
   applyTeams(0,1);createTeams();render();gs='menu';initMobile();
   updateCommentaryButton();
   updateCommentarySettings();
   updateCrowdSettings();
+  
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('Service Worker registered', reg))
+      .catch(err => console.error('Service Worker registration failed', err));
+  }
+  
+  checkUrlJoin();
 }
 const fsBtn = document.getElementById("fsBtn");
 const exitBtn=document.getElementById("exitBtn");
@@ -2825,123 +2933,46 @@ document.addEventListener("fullscreenchange",()=>{
         document.fullscreenElement ? "🡽" : "⛶";
 });
   // ═══════════════════════════════════════════════════════
-// LIVE SETTINGS & TACTICAL CONFIGURATION SYSTEM
+// PWA INSTALLATION & AI DIFFICULTY SYSTEMS
 // ═══════════════════════════════════════════════════════
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const installBtn = document.getElementById('pwaInstallBtn');
+  if (installBtn) installBtn.style.display = 'inline-flex';
+});
 
-// Capture deep copy of initial constants for clean operational rollbacks
-const ORIGINAL_TEAMS_BACKUP = JSON.parse(JSON.stringify(TEAMS));
-
-function openSettingsModal() {
-  SFX.select();
-  
-  // Render the current active squad attributes into input selectors
-  const container = document.getElementById('teamStatSliders');
-  const activeTeamIdx = gs === 'menu' ? selTeam : (players[0]?.team ?? selTeam);
-  const targetStatProfile = TEAMS[activeTeamIdx].st;
-  
-  container.innerHTML = `
-    <div style="font-size:12px; font-weight:bold; color:var(--fg); margin-bottom:6px; text-transform:uppercase;">Customizing Profile: ${TEAMS[activeTeamIdx].name}</div>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-      <div>
-        <label style="display:block; font-size:11px; color:var(--muted);">SPEED SCALE (${targetStatProfile.spd.toFixed(2)})</label>
-        <input type="range" id="sld_spd" min="0.5" max="2.0" step="0.1" value="${targetStatProfile.spd}" oninput="updateActiveStatMemory(${activeTeamIdx}, 'spd', this.value)">
-      </div>
-      <div>
-        <label style="display:block; font-size:11px; color:var(--muted);">SHOOTING FORCE (${targetStatProfile.sht.toFixed(2)})</label>
-        <input type="range" id="sld_sht" min="0.5" max="2.0" step="0.1" value="${targetStatProfile.sht}" oninput="updateActiveStatMemory(${activeTeamIdx}, 'sht', this.value)">
-      </div>
-      <div>
-        <label style="display:block; font-size:11px; color:var(--muted);">PASS VELOCITY (${targetStatProfile.pas.toFixed(2)})</label>
-        <input type="range" id="sld_pas" min="0.5" max="2.0" step="0.1" value="${targetStatProfile.pas}" oninput="updateActiveStatMemory(${activeTeamIdx}, 'pas', this.value)">
-      </div>
-      <div>
-        <label style="display:block; font-size:11px; color:var(--muted);">DEFENSE RATING (${targetStatProfile.def.toFixed(2)})</label>
-        <input type="range" id="sld_def" min="0.5" max="2.0" step="0.1" value="${targetStatProfile.def}" oninput="updateActiveStatMemory(${activeTeamIdx}, 'def', this.value)">
-      </div>
-    </div>
-  `;
-  
-  showScr('settingsModal');
-}
-
-function closeSettingsModal() {
-  SFX.select();
-  hideScr('settingsModal');
-}
-
-function updateActiveStatMemory(teamIdx, key, value) {
-  const parsedVal = parseFloat(value);
-  TEAMS[teamIdx].st[key] = parsedVal;
-  
-  // Re-synchronize running game metrics configuration on the fly
-  if (gs === 'playing' || gs === 'kickoff' || gs === 'goal') {
-    applyTeams(selTeam, oppTeam);
-    // Dynamically update existing player entity fields without resetting entity array
-    players.forEach(p => {
-      const activeStats = getSt(p.team);
-      p.speed = p.role === 'gk' ? (CFG.gkSpd * activeStats.gk) : (CFG.pSpd * activeStats.spd);
-    });
-  }
-}
-
-function applyLiveInterfaceEngine() {
-  const jSize = document.getElementById('cfgJoySize').value;
-  const jPos = document.getElementById('cfgJoyPos').value;
-  const bSize = document.getElementById('cfgBtnSize').value;
-  const bPos = document.getElementById('cfgBtnPos').value;
-
-  // Live text metrics label updates
-  document.getElementById('lblJoySize').textContent = `JOYSTICK BOUNDS: ${jSize}px`;
-  document.getElementById('lblJoyPos').textContent = `JOYSTICK LEFT MARGIN: ${jPos}px`;
-  document.getElementById('lblBtnSize').textContent = `ACTION BUTTON SIZE: ${bSize}px`;
-  document.getElementById('lblBtnPos').textContent = `ACTION RIGHT COLUMN MARGIN: ${bPos}px`;
-
-  // Real-time DOM element alterations
-  const jZone = document.getElementById('jZone');
-  const aPne = document.querySelector('.aPne');
-  
-  if (jZone) {
-    jZone.style.width = `${jSize}px`;
-    jZone.style.height = `${jSize}px`;
-    jZone.style.left = `${jPos}px`;
-    
-    // Keeps the joystick perfectly centered inside its new boundaries
-    jZone.style.top = '80%'; 
-    jZone.style.transform = 'translateY(-50%)';
-  }
-  if (aPne) {
-    aPne.style.right = `${bPos}px`;
-  }
-
-  // Adjust scaling for button targets
-  document.querySelectorAll('.mb:not(.sml)').forEach(btn => {
-    btn.style.width = `${bSize}px`;
-    btn.style.height = `${parseFloat(bSize) * 0.97}px`;
+function triggerPwaInstall() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then((choiceResult) => {
+    if (choiceResult.outcome === 'accepted') {
+      console.log('StrikerFC Installed');
+    }
+    deferredPrompt = null;
+    const installBtn = document.getElementById('pwaInstallBtn');
+    if (installBtn) installBtn.style.display = 'none';
   });
 }
 
-
-function resetEngineToDefaults() {
-  if (!confirm("Restore factory interface layout and base configurations?")) return;
+function setDifficulty(diff) {
   SFX.select();
-  
-  // Reset Layout inputs
-  document.getElementById('setBtnSize').value = 82;
-  document.getElementById('setBtnPos').value = 70;
-  applyLiveInterfaceSettings();
-  
-  // Deep clone tracking structure states back to initial load values
-  TEAMS.forEach((t, i) => {
-    TEAMS[i].st = JSON.parse(JSON.stringify(ORIGINAL_TEAMS_BACKUP[i].st));
+  aiDifficulty = diff;
+  document.querySelectorAll('.diff-btn').forEach(btn => {
+    btn.classList.remove('active');
+    btn.style.borderColor = 'var(--border)';
+    btn.style.color = 'var(--fg)';
+    btn.style.background = 'var(--card)';
   });
-  
-  if (gs === 'playing' || gs === 'kickoff' || gs === 'goal') {
-    applyTeams(selTeam, oppTeam);
-    createTeams(false); 
+  const activeBtn = document.getElementById('diffBtn_' + diff);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+    activeBtn.style.borderColor = 'var(--accent)';
+    activeBtn.style.color = 'var(--accent)';
+    activeBtn.style.background = 'rgba(244,162,97,.15)';
   }
-  
-  toast("Engine configuration reset!");
-  closeSettingsModal();
+  toast(`AI Difficulty: ${diff.toUpperCase()}`);
 }
 
   // ═══════════════════════════════════════════════════════
