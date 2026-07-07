@@ -1013,7 +1013,7 @@ let goalTimer=0,koTimer=0,koTeam=0;
 let lastTS=0,accum=0;
 let human=null;
 let passHeld=false,tabHeld=false;
-let shtHeld=false,shtPow=0,passPow=0,passIsLob=false,shtIsLob=false,mobShotIsLob=false; let lastTeammateTapId=null,lastTeammateTapTime=0;
+let shtHeld=false,shtPow=0,passPow=0; let lastTeammateTapId=null,lastTeammateTapTime=0;
 let sprintMob=false;
 let controlMode='gestures';
 let halfFired=false;
@@ -1048,7 +1048,7 @@ function adapt(){
 const keys={};
 window.addEventListener('keydown',e=>{
   keys[e.code]=true;
-  if(['Space','ShiftLeft','ShiftRight','Tab','KeyQ','KeyE'].includes(e.code))e.preventDefault();
+  if(['Space','ShiftLeft','ShiftRight','Tab'].includes(e.code))e.preventDefault();
   if(e.code === 'Escape' || e.code === 'KeyP') {
     if (gs === 'playing' || gs === 'kickoff' || gs === 'goal') {
       togglePause(!isPaused);
@@ -1381,7 +1381,7 @@ function applyTeams(i1,i2){
 
 function createTeams(rst=true){
   players=[];
-  ball={x:F.x+F.w/2,y:F.y+F.h/2,z:0,vx:0,vy:0,vz:0,own:-1,lt:-1};
+  ball={x:F.x+F.w/2,y:F.y+F.h/2,vx:0,vy:0,own:-1,lt:-1};
   if(rst){score=[0,0];matchTime=0;mSt={shots:[0,0],passes:[0,0],tackles:[0,0]};halfFired=false;koTeam=0;sidesSwitched=false;pen={active:false}; resetTacMem();}
   
   parts=[];bTrail=[];
@@ -1454,7 +1454,7 @@ function procHuman(pl){
   if(dx||dy){const m=Math.sqrt(dx*dx+dy*dy);dx/=m;dy/=m;}
   
   const hb=ball.own===pl.id;
-  const shk=keys['ShiftLeft']||keys['ShiftRight']||keys['KeyE'];
+  const shk=keys['ShiftLeft']||keys['ShiftRight'];
   const sprKeys=keys['ShiftLeft']||keys['ShiftRight'];
   
   // 1. Calculate individual sprint cutoff based on stamina safely
@@ -1480,21 +1480,18 @@ function procHuman(pl){
   if(keys['Tab']&&!tabHeld){tabHeld=true;pTgtIdx=(pTgtIdx+1)%Math.max(1,pTargets.length);SFX.select();}
   if(!keys['Tab'])tabHeld=false;
 
-  // SPACE or Q hold = charge pass (Space for ground pass, Q for lob pass)
-  const psk = keys['Space'] || keys['KeyQ'];
-  const isLobPassKey = keys['KeyQ'];
+  // SPACE hold = charge pass
+  const psk = keys['Space'];
   if(hb){
     if(psk&&!passHeld){
       passHeld=true;
       passPow=0;
-      passIsLob=isLobPassKey;
       document.getElementById('pwrMtr').style.visibility='visible';
     }
     if(passHeld&&psk){
       passPow=Math.min(1,passPow+.035);
       document.getElementById('pwrFill').style.height=(passPow*100)+'%';
       if(Math.floor(passPow*10)%3===0)SFX.charge(passPow);
-      if(keys['KeyQ']) passIsLob = true;
     }
     if(!psk&&passHeld){
       passHeld=false;
@@ -1503,7 +1500,7 @@ function procHuman(pl){
       if(pl.role==='gk' && !curPTgt) {
         gkClear(pl);
       } else {
-        doPass(pl,curPTgt,passIsLob);
+        doPass(pl,curPTgt);
       }
       passPow=0;
     }
@@ -1515,13 +1512,11 @@ function procHuman(pl){
     if(!psk)passHeld=false;
   }
 
-  // SHIFT or E hold = charge shot (Shift for ground shot, E for lofted shot)
-  const isLobShotKey = keys['KeyE'];
+  // SHIFT hold = charge shot
   if(hb){
     if(shk&&!shtHeld){
       shtHeld=true;
       shtPow=0;
-      shtIsLob=isLobShotKey;
       document.getElementById('pwrMtr').style.visibility='visible';
     }
     if(shtHeld&&shk){
@@ -1534,15 +1529,12 @@ function procHuman(pl){
       shtPow=Math.min(1,shtPow+.028);
       document.getElementById('pwrFill').style.height=(shtPow*100)+'%';
       if(Math.floor(shtPow*10)%3===0)SFX.charge(shtPow);
-      if(keys['KeyE']) shtIsLob = true;
     }
     if(!shk&&shtHeld){
       shtHeld=false;document.getElementById('pwrMtr').style.visibility='hidden';
       document.getElementById('pwrFill').style.height='0%';
-      const isLob = shtIsLob || mobShotIsLob;
-      doShoot(pl,shtPow,isLob);
+      doShoot(pl,shtPow);
       shtPow=0;
-      mobShotIsLob=false;
     }
   }else if(shtHeld){shtHeld=false;shtPow=0;document.getElementById('pwrMtr').style.visibility='hidden';}
 }
@@ -1551,17 +1543,12 @@ function procHuman(pl){
 // ═══════════════════════════════════════════════════════
 // PASSING & SHOOTING
 // ═══════════════════════════════════════════════════════
-function doPass(psr,forced,lob=false){
+function doPass(psr,forced){
   const tgt=forced||bestPTgt(psr);if(!tgt)return;
   const lt=dst(psr.x,psr.y,tgt.x,tgt.y)/CFG.passSpd;
   const px=tgt.x+tgt.vx*lt*.6,py=tgt.y+tgt.vy*lt*.6;
   const pdx=px-psr.x,pdy=py-psr.y,pd=Math.max(1,Math.sqrt(pdx*pdx+pdy*pdy));
   ball.vx=(pdx/pd)*CFG.passSpd*getSt(psr.team).pas; ball.vy=(pdy/pd)*CFG.passSpd*getSt(psr.team).pas;
-  if (lob) {
-    ball.vz = 1.0 + Math.min(pd, 300)/300 * 2.8;
-  } else {
-    ball.vz = 0;
-  }
   ball.own=-1;ball.lt=psr.team;
   ball.relBy=psr.id;ball.relT=10;
   gT(psr.team).forEach(p=>p.lead=false);tgt.lead=true;
@@ -1582,7 +1569,7 @@ function bestPTgt(psr){
   });
   return best;
 }
-function doShoot(sh,pow=1,lob=false){
+function doShoot(sh,pow=1){
   const acc=clamp(.5+pow*.5,0,1);
   const gx = shotAimX;
   const gy = shotAimY;
@@ -1590,11 +1577,6 @@ function doShoot(sh,pow=1,lob=false){
 
   ball.vx=(dx/d)*CFG.shootSpd*(.65+pow*.45)*getSt(sh.team).sht;
   ball.vy=(dy/d)*CFG.shootSpd*(.65+pow*.45)*getSt(sh.team).sht;
-  if (lob) {
-    ball.vz = 2.0 + pow * 3.5;
-  } else {
-    ball.vz = 0;
-  }
 
   ball.own=-1;ball.lt=sh.team;
   ball.relBy=sh.id;ball.relT=10;
@@ -1853,31 +1835,12 @@ function aiCarr(p, team, opps) {
 }
 
 
-function distToSegment(px, py, x1, y1, x2, y2) {
-  const dx = x2 - x1, dy = y2 - y1;
-  const l2 = dx * dx + dy * dy;
-  if (l2 === 0) return dst(px, py, x1, y1);
-  let t = ((px - x1) * dx + (py - y1) * dy) / l2;
-  t = Math.max(0, Math.min(1, t));
-  return dst(px, py, x1 + t * dx, y1 + t * dy);
-}
-
-function isLaneBlocked(p1, p2) {
-  const opponents = gT(1 - p1.team);
-  for (let o of opponents) {
-    if (distToSegment(o.x, o.y, p1.x, p1.y, p2.x, p2.y) < 45) return true;
-  }
-  return false;
-}
-
 function aiSht(p){
   const gx=p.team===0?F.x+F.w:F.x;
   const gy=F.y+F.h/2+(rnd()-.5)*F.goalH*.55;
   shotAimX = gx;
   shotAimY = gy;
-  const d = dst(p.x, p.y, gx, gy);
-  const needsLob = (d > 200) && (rnd() < 0.65);
-  doShoot(p, 0.75 + rnd() * 0.25, needsLob);
+  doShoot(p, 0.75 + rnd() * 0.25);
 }
 
 function aiPos(p,team,opps){
@@ -1929,9 +1892,7 @@ function aiPos(p,team,opps){
 
 
 function aiPass(psr,tgt){
-  const d = dst(psr.x, psr.y, tgt.x, tgt.y);
-  const needsLob = (d > 220) || isLaneBlocked(psr, tgt);
-  doPass(psr, tgt, needsLob);
+  doPass(psr, tgt);
 }
 function aiChase(p){
   const ad=adapt();
@@ -1981,20 +1942,9 @@ function updBall(){
     const p=players[ball.own];
     ball.x=p.x+Math.cos(p.angle)*(CFG.pR+CFG.bR+2);
     ball.y=p.y+Math.sin(p.angle)*(CFG.pR+CFG.bR+2);
-    ball.z=0; ball.vz=0;
     ball.vx=0;ball.vy=0;return;
   }
   ball.x+=ball.vx;ball.y+=ball.vy;
-  
-  if (ball.z > 0 || ball.vz !== 0) {
-    ball.z += ball.vz;
-    ball.vz -= 0.16; // gravity
-    if (ball.z <= 0) {
-      ball.z = 0;
-      ball.vz = -ball.vz * 0.45; // bounce
-      if (Math.abs(ball.vz) < 0.4) ball.vz = 0;
-    }
-  }
 
   ball.vx*=CFG.bFric;ball.vy*=CFG.bFric;
   if(Math.abs(ball.vx)<.05)ball.vx=0;
@@ -2008,20 +1958,11 @@ function updBall(){
 }
 function chkGoals(){
   const gT2=F.y+F.h/2-F.goalH/2,gB=F.y+F.h/2+F.goalH/2;
-  const bz = ball.z || 0;
   if(ball.x<F.x&&ball.y>gT2&&ball.y<gB){
-    if (bz <= 22) {
-      score[1]++;trigGoal(1);
-    } else {
-      rstBall(0); // Out of bounds over crossbar
-    }
+    score[1]++;trigGoal(1);
   }
   else if(ball.x>F.x+F.w&&ball.y>gT2&&ball.y<gB){
-    if (bz <= 22) {
-      score[0]++;trigGoal(0);
-    } else {
-      rstBall(1); // Out of bounds over crossbar
-    }
+    score[0]++;trigGoal(0);
   }
 }
 function chkOOB(){
@@ -2052,14 +1993,10 @@ function chkPickup(){
     if(ball.relT>0 && p.id===ball.relBy)return;
     const d=dst(p.x,p.y,ball.x,ball.y);
     if(d<CFG.catD+8 && d<cd){
-      const bz = ball.z || 0;
-      const canCatch = (p.role === 'gk') ? (bz <= 28) : (bz <= 8);
-      if (canCatch) {
-        cd=d;cl=p;
-      }
+      cd=d;cl=p;
     }
   });
-  if(cl){ball.own=cl.id;ball.lt=cl.team;ball.vx=0;ball.vy=0;ball.z=0;ball.vz=0;for(let i=0;i<3;i++)parts.push(mkP(ball.x,ball.y,'rgba(255,255,255,.5)',1));}
+  if(cl){ball.own=cl.id;ball.lt=cl.team;ball.vx=0;ball.vy=0;for(let i=0;i<3;i++)parts.push(mkP(ball.x,ball.y,'rgba(255,255,255,.5)',1));}
 }
 function chkNearMiss(){
   if(nmCool>0){nmCool--;return;}
@@ -2355,28 +2292,25 @@ function drawPlayer(p){
 
 
 function drawBall(){
-  const bx=ball.x,by=ball.y,bz=ball.z||0,br=CFG.bR;
+  const bx=ball.x,by=ball.y,br=CFG.bR;
   
-  // Dynamic Ball Shadow (scale and fade with height)
-  const shX = bx + 3 + bz * 0.12;
-  const shY = by + 4 + bz * 0.08;
-  const shRad = Math.max(2, br * (1 - bz * 0.006));
-  const shAlpha = Math.max(0.03, 0.28 - bz * 0.004);
+  // Dynamic Ball Shadow
+  const shX = bx + 3;
+  const shY = by + 4;
+  const shRad = br;
+  const shAlpha = 0.28;
   cx.fillStyle = `rgba(0,0,0,${shAlpha})`;
   cx.beginPath(); cx.ellipse(shX, shY, shRad * 1.2, shRad * 0.6, 0, 0, Math.PI*2); cx.fill();
 
-  const drawY = by - bz;
-  const drawR = br * (1 + bz * 0.004);
-
   if(ball.own<0&&Math.sqrt(ball.vx**2+ball.vy**2)>3){
-    const g=cx.createRadialGradient(bx,drawY,drawR,bx,drawY,drawR*3);
+    const g=cx.createRadialGradient(bx,by,br,bx,by,br*3);
     g.addColorStop(0,'rgba(255,255,255,.12)');g.addColorStop(1,'rgba(255,255,255,0)');
-    cx.fillStyle=g;cx.beginPath();cx.arc(bx,drawY,drawR*3,0,Math.PI*2);cx.fill();
+    cx.fillStyle=g;cx.beginPath();cx.arc(bx,by,br*3,0,Math.PI*2);cx.fill();
   }
   
   cx.fillStyle='#FFF';cx.strokeStyle='rgba(0,0,0,.32)';cx.lineWidth=1;
-  cx.beginPath();cx.arc(bx,drawY,drawR,0,Math.PI*2);cx.fill();cx.stroke();
-  cx.fillStyle='rgba(255,255,255,.7)';cx.beginPath();cx.arc(bx-drawR*0.25,drawY-drawR*0.25,drawR*.3,0,Math.PI*2);cx.fill();
+  cx.beginPath();cx.arc(bx,by,br,0,Math.PI*2);cx.fill();cx.stroke();
+  cx.fillStyle='rgba(255,255,255,.7)';cx.beginPath();cx.arc(bx-br*0.25,by-br*0.25,br*.3,0,Math.PI*2);cx.fill();
 }
 function drawParts(){parts.forEach(p=>{cx.globalAlpha=p.life;cx.fillStyle=p.c;cx.beginPath();cx.arc(p.x,p.y,Math.max(.5,p.sz*p.life),0,Math.PI*2);cx.fill();});cx.globalAlpha=1;}
 
@@ -2877,12 +2811,6 @@ function initMobile(){
     SFX.res();
     if(gs === 'menu' || controlMode === 'classic') return;
     
-    const rightTouches = Array.from(e.touches).filter(t => t.clientX >= window.innerWidth / 2);
-    if (rightTouches.length > 1 && isAimingShot) {
-      mobShotIsLob = true;
-      toast("LOB SHOT SELECTED ⚽⬆️");
-    }
-    
     for (let i = 0; i < e.changedTouches.length; i++) {
       const t = e.changedTouches[i];
       
@@ -3011,10 +2939,7 @@ function initMobile(){
               const direction = (sidesSwitched && gs !== 'penalty') ? -1 : 1;
               shotAimY = clamp(human.y + Math.tan(angle) * distToGoal * direction, F.y + F.h/2 - F.goalH/2 + 6, F.y + F.h/2 + F.goalH/2 - 6);
               
-              // Swipe speed or length determines if it is a lofted/lobbed shot
-              const speed = dist / duration;
-              const isLob = (speed > 0.45) || (dist > 75);
-              doShoot(human, 0.82, isLob);
+              doShoot(human, 0.82);
             }
           } else {
             // Tap to pass/tackle
