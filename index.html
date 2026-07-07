@@ -2825,17 +2825,16 @@ function backMenu(){
   document.getElementById('pauseBtn').classList.remove('vis');
   togglePause(false, false);
   BGM.stop();
+  if (document.fullscreenElement) {
+    document.exitFullscreen().catch(()=>{});
+  }
   applyTeams(0,1);createTeams();render();
   history.replaceState({}, document.title, window.location.pathname);
 }
 
 function triggerBackNavigation() {
   SFX.select();
-  if (window.history.state) {
-    window.history.back();
-  } else {
-    backMenu();
-  }
+  backMenu();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3094,6 +3093,7 @@ function initMobile(){
     if(SFX.on) BGM.start();
   },{once:true,passive:true});
   window.addEventListener('click',()=>{
+    if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{});
     SFX.res();
     if(SFX.on) BGM.start();
   },{once:true,passive:true});
