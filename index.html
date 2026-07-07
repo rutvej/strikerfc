@@ -464,7 +464,7 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
   <div class="team-grid" id="teamGrid"></div>
   <div class="btn-row">
     <button class="btn btn-p" id="btnKO" onclick="startFromTeamSel()">⚽ KICK OFF</button>
-    <button class="btn btn-sm" onclick="backMenu()">← BACK</button>
+    <button class="btn btn-sm" onclick="triggerBackNavigation()">← BACK</button>
   </div>
 </div>
 
@@ -475,7 +475,7 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
   <div class="bracket" id="bracketWrap"></div>
   <div class="btn-row">
     <button class="btn btn-p" id="btnNxt" onclick="startTrnMatch()">▶ PLAY YOUR MATCH</button>
-    <button class="btn btn-sm" onclick="backMenu()">← MENU</button>
+    <button class="btn btn-sm" onclick="triggerBackNavigation()">← MENU</button>
   </div>
 </div>
 
@@ -498,7 +498,7 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
     </div>
     <div class="sig-row">
       <button class="btn btn-sm" id="btnSigAct">🔗 CONNECT</button>
-      <button class="btn btn-sm" onclick="backMenu()">← BACK</button>
+      <button class="btn btn-sm" onclick="triggerBackNavigation()">← BACK</button>
     </div>
     <div class="sig-st" id="sigSt"></div>
   </div>
@@ -527,7 +527,7 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
     <div class="btn-row" style="justify-content:center">
       <button class="btn btn-p" id="btnEA" onclick="endAct()">▶ CONTINUE</button>
       <button class="btn btn-sm" id="btnTacShow" onclick="showTacticalLogsOverlay()">📋 TACTICAL REPORT</button>
-      <button class="btn btn-sm" onclick="backMenu()">← MENU</button>
+      <button class="btn btn-sm" onclick="triggerBackNavigation()">← MENU</button>
     </div>
 
   </div>
@@ -560,7 +560,7 @@ body{font-family:'Space Grotesk',sans-serif;color:var(--fg)}
 <div id="pauseOverlay" style="display:none; position:fixed; inset:0; background:rgba(10,15,26,0.85); backdrop-filter:blur(8px); z-index:1000; flex-direction:column; align-items:center; justify-content:center; gap:20px;">
   <div style="font-family:'Russo One',sans-serif; font-size:48px; color:var(--accent); letter-spacing:4px; text-shadow:0 0 20px rgba(244,162,97,0.3);">PAUSED</div>
   <button class="btn btn-p" onclick="togglePause(false)">▶ RESUME</button>
-  <button class="btn" onclick="backMenu()">🏠 EXIT TO MENU</button>
+  <button class="btn" onclick="triggerBackNavigation()">🏠 EXIT TO MENU</button>
 </div>
 
 <canvas id="gameCanvas"></canvas>
@@ -763,10 +763,10 @@ const BGM = {
   setEnabled(enabled) {
     this.on = enabled;
     localStorage.setItem('musicEnabled', enabled ? '1' : '0');
+    updateMusicSettings();
     if (!enabled) {
       this.stop();
     } else {
-      updateMusicSettings();
       if (!isPaused && SFX.on && gs !== 'menu') this.start();
     }
   }
@@ -1185,18 +1185,9 @@ const cv=document.getElementById('gameCanvas');
 const cx=cv.getContext('2d');
 cv.width=W;cv.height=H;
 
-function shouldCoverViewport() {
-  return window.innerWidth < 1024 && controlMode === 'gestures';
-}
-
 function resizeCv(){
   const r=W/H;let w=window.innerWidth,h=window.innerHeight;
-  if (shouldCoverViewport()) {
-    if (w / h > r) h = w / r;
-    else w = h * r;
-  } else {
-    if(w/h>r)w=h*r;else h=w/r;
-  }
+  if(w/h>r)w=h*r;else h=w/r;
   cv.style.cssText=`position:fixed;width:${w}px;height:${h}px;left:${(window.innerWidth-w)/2}px;top:${(window.innerHeight-h)/2}px`;
 }
 window.addEventListener('resize',()=>{resizeCv();checkOri()});
@@ -2857,6 +2848,15 @@ function backMenu(){
   history.replaceState({}, document.title, window.location.pathname);
 }
 
+function triggerBackNavigation() {
+  SFX.select();
+  if (window.history.state) {
+    window.history.back();
+  } else {
+    backMenu();
+  }
+}
+
 // ═══════════════════════════════════════════════════════
 // MOBILE
 // ═══════════════════════════════════════════════════════
@@ -3371,7 +3371,12 @@ function restartMenuAnimations() {
   });
 }
 function showScr(id){
-  document.getElementById(id).classList.remove('hidden');
+  ['menuScreen','teamScreen','tournamentScreen','signalScreen','endScreen'].forEach(s => {
+    const el = document.getElementById(s);
+    if (el) el.classList.add('hidden');
+  });
+  const target = document.getElementById(id);
+  if (target) target.classList.remove('hidden');
   if (id === 'menuScreen') {
     requestAnimationFrame(restartMenuAnimations);
   }
@@ -3404,7 +3409,7 @@ function showTraining() {
     <button class="btn btn-p" onclick="selectTrnType('single_team')">🛡️ SINGLE TEAM PLAY</button>
     <button class="btn" onclick="selectTrnType('ai_vs_ai')">🤖 AI VS AI VIEW</button>
     <button class="btn" onclick="selectTrnType('penalty_shoot')">🎯 PENALTY PRACTICE</button>
-    <button class="btn btn-sm" style="margin-top:20px;" onclick="backMenu()">← BACK</button>
+    <button class="btn btn-sm" style="margin-top:20px;" onclick="triggerBackNavigation()">← BACK</button>
   `;
   document.body.appendChild(overlay);
 }
@@ -3519,9 +3524,7 @@ document.addEventListener("fullscreenchange",()=>{
 });
 
 window.addEventListener('popstate', () => {
-  if (gs !== 'menu' || document.getElementById('menuScreen').classList.contains('hidden')) {
-    backMenu();
-  }
+  backMenu();
 });
   // ═══════════════════════════════════════════════════════
 // PWA INSTALLATION & AI DIFFICULTY SYSTEMS
