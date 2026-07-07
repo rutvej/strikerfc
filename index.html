@@ -882,76 +882,9 @@ const CrowdNoise={
   }
 };
 
-function updateCrowdDynamic() {
-  if (!CrowdNoise.on || !CrowdNoise._gain || !SFX.c) return;
-  const ballGoalDist = Math.min(
-    dst(ball.x, ball.y, F.x, F.y + F.h/2),
-    dst(ball.x, ball.y, F.x + F.w, F.y + F.h/2)
-  );
-  const maxDist = F.w / 2;
-  const closeness = clamp(1 - ballGoalDist / maxDist, 0, 1);
-  const targetVol = CrowdNoise.vol * (0.35 + closeness * 0.95);
-  CrowdNoise._gain.gain.setTargetAtTime(targetVol, SFX.c.currentTime, 0.4);
-}
-
-function triggerCrowdGasp() {
-  if (!CrowdNoise.on || !SFX.c) return;
-  try {
-    const t = SFX.c.currentTime;
-    const noise = SFX.c.createBufferSource();
-    const gain = SFX.c.createGain();
-    const filter = SFX.c.createBiquadFilter();
-    const buf = SFX.c.createBuffer(1, SFX.c.sampleRate * 0.9, SFX.c.sampleRate);
-    const dat = buf.getChannelData(0);
-    for (let i = 0; i < dat.length; i++) dat[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / dat.length, 0.6);
-    noise.buffer = buf;
-    noise.loop = false;
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(520, t);
-    filter.frequency.exponentialRampToValueAtTime(1700, t + 0.3);
-    filter.Q.setValueAtTime(1.6, t);
-    gain.gain.setValueAtTime(0.0, t);
-    gain.gain.linearRampToValueAtTime(CrowdNoise.vol * 0.14, t + 0.08);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(SFX.c.destination);
-    noise.start(t);
-    noise.stop(t + 0.72);
-  } catch(e){}
-}
-
-function triggerGoalCheer() {
-  if (!CrowdNoise.on || !SFX.c) return;
-  try {
-    const t = SFX.c.currentTime;
-    for (let i = 0; i < 3; i++) {
-      const noise = SFX.c.createBufferSource();
-      const gain = SFX.c.createGain();
-      const filter = SFX.c.createBiquadFilter();
-      const buf = SFX.c.createBuffer(1, SFX.c.sampleRate * 2.0, SFX.c.sampleRate);
-      const dat = buf.getChannelData(0);
-      for (let j = 0; j < dat.length; j++) {
-        const swell = Math.sin((j / dat.length) * Math.PI * 2 * (1.5 + i * 0.2)) * 0.22;
-        dat[j] = ((Math.random() * 2 - 1) * 0.6 + swell) * Math.pow(1 - j / dat.length, 0.25);
-      }
-      noise.buffer = buf;
-      noise.loop = false;
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(620 + i * 140, t);
-      filter.frequency.exponentialRampToValueAtTime(1350 + i * 180, t + 0.7);
-      filter.Q.setValueAtTime(1.0, t);
-      gain.gain.setValueAtTime(0.0, t);
-      gain.gain.linearRampToValueAtTime(CrowdNoise.vol * 0.22, t + 0.18 + i * 0.06);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 2.0 + i * 0.12);
-      noise.connect(filter);
-      filter.connect(gain);
-      gain.connect(SFX.c.destination);
-      noise.start(t + i * 0.05);
-      noise.stop(t + 2.1 + i * 0.12);
-    }
-  } catch(e){}
-}
+function updateCrowdDynamic() {}
+function triggerCrowdGasp() {}
+function triggerGoalCheer() {}
 let bestVoice=null;
 function chooseBestVoice(){
   const voices=window.speechSynthesis?.getVoices()||[];
@@ -989,53 +922,75 @@ let commentaryMode='text'; // text | audio | off
 function speakCommentary(text){
   if(!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
-  const utter1=new SpeechSynthesisUtterance(text);
-  if(bestVoice) utter1.voice=bestVoice;
-  utter1.rate=1.0;utter1.pitch=0.88;utter1.volume=1;
-  window.speechSynthesis.speak(utter1);
-  
-  // Announcement loudspeaker stadium delay echo
-  setTimeout(() => {
-    if (commentaryMode === 'audio' && window.speechSynthesis.speaking) {
-      const utter2=new SpeechSynthesisUtterance(text);
-      if(bestVoice) utter2.voice=bestVoice;
-      utter2.rate=0.96;utter2.pitch=0.82;utter2.volume=0.35;
-      window.speechSynthesis.speak(utter2);
-    }
-  }, 220);
+  const utter=new SpeechSynthesisUtterance(text);
+  if(bestVoice) utter.voice=bestVoice;
+  utter.rate=1.05;utter.pitch=1.05;utter.volume=1;
+  window.speechSynthesis.speak(utter);
 }
 function generateCommentary(type,custom){
-  if(custom) return custom;
+  if(custom && typeof custom === 'string') return custom;
   const minute = Math.floor(matchTime/60);
   const time = `${minute}'`;
   const isHomeLeading = score[0] >= score[1];
-  const teamName = ['goal','lead','level','champ','gkp','save'].includes(type) ? (isHomeLeading?CFG.t1nm:CFG.t2nm) : '';
+  
+  // Fetch contextual details dynamically
+  const lastKicker = (ball.relBy !== undefined && players[ball.relBy]) ? players[ball.relBy] : null;
+  const kickerName = lastKicker ? `number ${lastKicker.num}` : 'the striker';
+  const kickerTeamName = lastKicker ? (lastKicker.team === 0 ? CFG.t1nm : CFG.t2nm) : 'their side';
+  
+  const gkRef = players.find(p => p.role === 'gk' && p.team === (ball.lt === 0 ? 1 : 0));
+  const gkName = gkRef ? `number ${gkRef.num}` : 'the goalkeeper';
+  const gkTeamName = gkRef ? (gkRef.team === 0 ? CFG.t1nm : CFG.t2nm) : 'defense';
+
   const phraseSets={
-    goal:[`${time} — WHAT A GOAL! ${pick(['The crowd are electric!','A finish from another planet!','That will be replayed again and again!'])}`,
-          `${time} — ${teamName} explode into the box and bury it!`,
-          `${time} — pure genius in front of goal!`],
-    save:[`${time} — what a reflex from the keeper!`,
-          `${time} — DENIED! brilliant stop!`,
-          `${time} — the keeper is keeping them in it!`],
-    tackle:[`${time} — clean challenge there!`,
-            `${time} — he cuts it out brilliantly!`,
-            `${time} — that was vital defending!`],
-    ko:[`${time} — and the match is underway!`,
-        `${time} — the whistle has gone and we are live!`],
-    near:[`${time} — so close to glory!`,
-          `${time} — that would have been inches away!`],
-    lead:[`${time} — they take the lead!`,
-          `${time} — suddenly the scoreboard changes!`],
-    level:[`${time} — back on level terms!`,
-           `${time} — what a response!`],
-    half:[`${time} — half time arrives. Catch your breath!`,
-          `${time} — a tense first half comes to an end!`],
-    full:[`${time} — full time, and what a spectacle!`,
-          `${time} — the whistle blows on an epic game!`],
-    gkp:[`${time} — keeper distribution looks sharp!`,
-         `${time} — good composure from the goalkeeper!`],
-    champ:[`${time} — CHAMPIONS! The crowd can barely contain themselves!`,
-           `${time} — an unforgettable triumph!`],
+    goal:[
+      `${time} — SENSATIONAL GOAL! ${kickerName} scores a beauty for ${kickerTeamName}!`,
+      `${time} — IT'S IN! What an incredible finish from ${kickerName}!`,
+      `${time} — Net buster! ${kickerName} blasts it home for ${kickerTeamName}!`
+    ],
+    save:[
+      `${time} — AMAZING REFLEXES! ${gkName} pulls off a spectacular diving save!`,
+      `${time} — Denied! ${gkName} makes a crucial stop for ${gkTeamName}!`,
+      `${time} — World-class goalkeeping! ${gkName} parries it away!`
+    ],
+    tackle:[
+      `${time} — What a challenge! Defending is absolutely solid!`,
+      `${time} — A clean challenge to win back the ball!`,
+      `${time} — vital tackle to prevent the attack!`
+    ],
+    ko:[
+      `${time} — Referee blows the whistle, we are underway!`,
+      `${time} — The match kicks off, expectations are high!`
+    ],
+    near:[
+      `${time} — Off the woodwork! So incredibly close!`,
+      `${time} — Unbelievable escape! Hitting the post!`,
+      `${time} — The shot flashes millimeters wide of the post!`
+    ],
+    lead:[
+      `${time} — And they break the deadlock! They take the lead!`,
+      `${time} — The stadium erupts as they go in front!`
+    ],
+    level:[
+      `${time} — Equalizer! We are back on even terms!`,
+      `${time} — What a game! They level the score!`
+    ],
+    half:[
+      `${time} — Halftime whistle! Players head into the tunnel.`,
+      `${time} — Tense first half concludes, time to strategize!`
+    ],
+    full:[
+      `${time} — Full time! An absolute classic has concluded!`,
+      `${time} — The final whistle blows on an epic battle!`
+    ],
+    gkp:[
+      `${time} — Clean distribution from ${gkName}.`,
+      `${time} — Goalkeeper controls the play with composure.`
+    ],
+    champ:[
+      `${time} — CHAMPIONS! The trophy is theirs!`,
+      `${time} — An unforgettable victory in the finals!`
+    ],
   };
   const lines=phraseSets[type]||CM[type]||[`${time} — ${type}`];
   return pick(lines);
@@ -1501,7 +1456,7 @@ function applyTeams(i1,i2){
 
 function createTeams(rst=true){
   players=[];
-  ball={x:F.x+F.w/2,y:F.y+F.h/2,vx:0,vy:0,own:-1,lt:-1};
+  ball={x:F.x+F.w/2,y:F.y+F.h/2,z:0,vx:0,vy:0,vz:0,own:-1,lt:-1};
   if(rst){score=[0,0];matchTime=0;mSt={shots:[0,0],passes:[0,0],tackles:[0,0]};halfFired=false;koTeam=0;sidesSwitched=false;pen={active:false}; resetTacMem();}
   
   parts=[];bTrail=[];
@@ -1639,6 +1594,7 @@ function doPass(psr,forced){
   const px=tgt.x+tgt.vx*lt*.6,py=tgt.y+tgt.vy*lt*.6;
   const pdx=px-psr.x,pdy=py-psr.y,pd=Math.max(1,Math.sqrt(pdx*pdx+pdy*pdy));
   ball.vx=(pdx/pd)*CFG.passSpd*getSt(psr.team).pas; ball.vy=(pdy/pd)*CFG.passSpd*getSt(psr.team).pas;
+  ball.vz = 1.0 + Math.min(pd, 300)/300 * 1.8;
   ball.own=-1;ball.lt=psr.team;
   ball.relBy=psr.id;ball.relT=10;
   gT(psr.team).forEach(p=>p.lead=false);tgt.lead=true;
@@ -1667,6 +1623,7 @@ function doShoot(sh,pow=1){
 
   ball.vx=(dx/d)*CFG.shootSpd*(.65+pow*.45)*getSt(sh.team).sht;
   ball.vy=(dy/d)*CFG.shootSpd*(.65+pow*.45)*getSt(sh.team).sht;
+  ball.vz = 2.0 + pow * 3.5;
 
   ball.own=-1;ball.lt=sh.team;
   ball.relBy=sh.id;ball.relT=10;
@@ -2041,9 +1998,21 @@ function updBall(){
     const p=players[ball.own];
     ball.x=p.x+Math.cos(p.angle)*(CFG.pR+CFG.bR+2);
     ball.y=p.y+Math.sin(p.angle)*(CFG.pR+CFG.bR+2);
+    ball.z=0; ball.vz=0;
     ball.vx=0;ball.vy=0;return;
   }
   ball.x+=ball.vx;ball.y+=ball.vy;
+  
+  if (ball.z > 0 || ball.vz !== 0) {
+    ball.z += ball.vz;
+    ball.vz -= 0.16; // gravity
+    if (ball.z <= 0) {
+      ball.z = 0;
+      ball.vz = -ball.vz * 0.45; // bounce
+      if (Math.abs(ball.vz) < 0.4) ball.vz = 0;
+    }
+  }
+
   ball.vx*=CFG.bFric;ball.vy*=CFG.bFric;
   if(Math.abs(ball.vx)<.05)ball.vx=0;
   if(Math.abs(ball.vy)<.05)ball.vy=0;
@@ -2088,7 +2057,7 @@ if(ball.relT>0 && p.id===ball.relBy)return;
 const d=dst(p.x,p.y,ball.x,ball.y);
 if(d<CFG.catD+8 && d<cd){cd=d;cl=p;}
 });
-if(cl){ball.own=cl.id;ball.lt=cl.team;ball.vx=0;ball.vy=0;for(let i=0;i<3;i++)parts.push(mkP(ball.x,ball.y,'rgba(255,255,255,.5)',1));}
+if(cl){ball.own=cl.id;ball.lt=cl.team;ball.vx=0;ball.vy=0;ball.z=0;ball.vz=0;for(let i=0;i<3;i++)parts.push(mkP(ball.x,ball.y,'rgba(255,255,255,.5)',1));}
 }
 function chkNearMiss(){
   if(nmCool>0){nmCool--;return;}
@@ -2384,17 +2353,29 @@ function drawPlayer(p){
 
 
 function drawBall(){
-  const bx=ball.x,by=ball.y,br=CFG.bR;
-  cx.fillStyle='rgba(0,0,0,.28)';cx.beginPath();cx.ellipse(bx+2,by+3,br,br*.5,0,0,Math.PI*2);cx.fill();
-  if(ball.own<0&&Math.sqrt(ball.vx**2+ball.vy**2)>3){
-    const g=cx.createRadialGradient(bx,by,br,bx,by,br*3);g.addColorStop(0,'rgba(255,255,255,.1)');g.addColorStop(1,'rgba(255,255,255,0)');
-    cx.fillStyle=g;cx.beginPath();cx.arc(bx,by,br*3,0,Math.PI*2);cx.fill();
-  }
-  cx.fillStyle='#FFF';cx.strokeStyle='rgba(0,0,0,.28)';cx.lineWidth=1;
-  cx.beginPath();cx.arc(bx,by,br,0,Math.PI*2);cx.fill();cx.stroke();
-  cx.fillStyle='rgba(255,255,255,.6)';cx.beginPath();cx.arc(bx-1.5,by-1.5,br*.34,0,Math.PI*2);cx.fill();
-}
+  const bx=ball.x,by=ball.y,bz=ball.z||0,br=CFG.bR;
+  
+  // Dynamic Ball Shadow (scale and fade with height)
+  const shX = bx + 3 + bz * 0.12;
+  const shY = by + 4 + bz * 0.08;
+  const shRad = Math.max(2, br * (1 - bz * 0.006));
+  const shAlpha = Math.max(0.03, 0.28 - bz * 0.004);
+  cx.fillStyle = `rgba(0,0,0,${shAlpha})`;
+  cx.beginPath(); cx.ellipse(shX, shY, shRad * 1.2, shRad * 0.6, 0, 0, Math.PI*2); cx.fill();
 
+  const drawY = by - bz;
+  const drawR = br * (1 + bz * 0.004);
+
+  if(ball.own<0&&Math.sqrt(ball.vx**2+ball.vy**2)>3){
+    const g=cx.createRadialGradient(bx,drawY,drawR,bx,drawY,drawR*3);
+    g.addColorStop(0,'rgba(255,255,255,.12)');g.addColorStop(1,'rgba(255,255,255,0)');
+    cx.fillStyle=g;cx.beginPath();cx.arc(bx,drawY,drawR*3,0,Math.PI*2);cx.fill();
+  }
+  
+  cx.fillStyle='#FFF';cx.strokeStyle='rgba(0,0,0,.32)';cx.lineWidth=1;
+  cx.beginPath();cx.arc(bx,drawY,drawR,0,Math.PI*2);cx.fill();cx.stroke();
+  cx.fillStyle='rgba(255,255,255,.7)';cx.beginPath();cx.arc(bx-drawR*0.25,drawY-drawR*0.25,drawR*.3,0,Math.PI*2);cx.fill();
+}
 function drawParts(){parts.forEach(p=>{cx.globalAlpha=p.life;cx.fillStyle=p.c;cx.beginPath();cx.arc(p.x,p.y,Math.max(.5,p.sz*p.life),0,Math.PI*2);cx.fill();});cx.globalAlpha=1;}
 
 function drawHUD(){
