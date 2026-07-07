@@ -1088,7 +1088,7 @@ let goalTimer=0,koTimer=0,koTeam=0;
 let lastTS=0,accum=0;
 let human=null;
 let passHeld=false,tabHeld=false;
-let shtHeld=false,shtPow=0,passPow=0; let lastTeammateTapId=null,lastTeammateTapTime=0;
+let shtHeld=false,shtPow=0,passPow=0,passIsLob=false,shtIsLob=false,mobShotIsLob=false; let lastTeammateTapId=null,lastTeammateTapTime=0;
 let sprintMob=false;
 let controlMode='gestures';
 let halfFired=false;
@@ -1123,7 +1123,7 @@ function adapt(){
 const keys={};
 window.addEventListener('keydown',e=>{
   keys[e.code]=true;
-  if(['Space','ShiftLeft','ShiftRight','Tab'].includes(e.code))e.preventDefault();
+  if(['Space','ShiftLeft','ShiftRight','Tab','KeyQ','KeyE'].includes(e.code))e.preventDefault();
   if(e.code === 'Escape' || e.code === 'KeyP') {
     if (gs === 'playing' || gs === 'kickoff' || gs === 'goal') {
       togglePause(!isPaused);
@@ -1529,10 +1529,11 @@ function procHuman(pl){
   if(dx||dy){const m=Math.sqrt(dx*dx+dy*dy);dx/=m;dy/=m;}
   
   const hb=ball.own===pl.id;
-  const shk=keys['ShiftLeft']||keys['ShiftRight'];
+  const shk=keys['ShiftLeft']||keys['ShiftRight']||keys['KeyE'];
+  const sprKeys=keys['ShiftLeft']||keys['ShiftRight'];
   
   // 1. Calculate individual sprint cutoff based on stamina safely
-  let spr = (shk && !hb) || sprintMob;
+  let spr = (sprKeys && !hb) || sprintMob;
   if (pl.sta <= 0.35) {
     spr = false; // Forced cutoff when exhausted
   }
@@ -1554,41 +1555,50 @@ function procHuman(pl){
   if(keys['Tab']&&!tabHeld){tabHeld=true;pTgtIdx=(pTgtIdx+1)%Math.max(1,pTargets.length);SFX.select();}
   if(!keys['Tab'])tabHeld=false;
 
-  // SPACE pass/tackle (Hold to charge lob)
+  // SPACE or Q hold = charge pass (Space for ground pass, Q for lob pass)
+  const psk = keys['Space'] || keys['KeyQ'];
+  const isLobPassKey = keys['KeyQ'];
   if(hb){
-    if(keys['Space']&&!passHeld){
+    if(psk&&!passHeld){
       passHeld=true;
       passPow=0;
+      passIsLob=isLobPassKey;
       document.getElementById('pwrMtr').style.visibility='visible';
     }
-    if(passHeld&&keys['Space']){
+    if(passHeld&&psk){
       passPow=Math.min(1,passPow+.035);
       document.getElementById('pwrFill').style.height=(passPow*100)+'%';
       if(Math.floor(passPow*10)%3===0)SFX.charge(passPow);
+      if(keys['KeyQ']) passIsLob = true;
     }
-    if(!keys['Space']&&passHeld){
+    if(!psk&&passHeld){
       passHeld=false;
       document.getElementById('pwrMtr').style.visibility='hidden';
       document.getElementById('pwrFill').style.height='0%';
       if(pl.role==='gk' && !curPTgt) {
         gkClear(pl);
       } else {
-        const isLob = (passPow >= 0.3);
-        doPass(pl,curPTgt,isLob);
+        doPass(pl,curPTgt,passIsLob);
       }
       passPow=0;
     }
   } else {
-    if(keys['Space']&&!passHeld){
+    if(psk&&!passHeld){
       passHeld=true;
       attemptTkl(pl);
     }
-    if(!keys['Space'])passHeld=false;
+    if(!psk)passHeld=false;
   }
 
-  // SHIFT hold = charge shot
+  // SHIFT or E hold = charge shot (Shift for ground shot, E for lofted shot)
+  const isLobShotKey = keys['KeyE'];
   if(hb){
-    if(shk&&!shtHeld){shtHeld=true;shtPow=0;document.getElementById('pwrMtr').style.visibility='visible';}
+    if(shk&&!shtHeld){
+      shtHeld=true;
+      shtPow=0;
+      shtIsLob=isLobShotKey;
+      document.getElementById('pwrMtr').style.visibility='visible';
+    }
     if(shtHeld&&shk){
       if(shtPow===0){
         const gx = pl.team===0 ? F.x+F.w : F.x;
@@ -1599,13 +1609,15 @@ function procHuman(pl){
       shtPow=Math.min(1,shtPow+.028);
       document.getElementById('pwrFill').style.height=(shtPow*100)+'%';
       if(Math.floor(shtPow*10)%3===0)SFX.charge(shtPow);
+      if(keys['KeyE']) shtIsLob = true;
     }
     if(!shk&&shtHeld){
       shtHeld=false;document.getElementById('pwrMtr').style.visibility='hidden';
       document.getElementById('pwrFill').style.height='0%';
-      const isLob = (shtPow >= 0.3);
+      const isLob = shtIsLob || mobShotIsLob;
       doShoot(pl,shtPow,isLob);
       shtPow=0;
+      mobShotIsLob=false;
     }
   }else if(shtHeld){shtHeld=false;shtPow=0;document.getElementById('pwrMtr').style.visibility='hidden';}
 }
@@ -2939,6 +2951,11 @@ function initMobile(){
   window.addEventListener('touchstart', e => {
     SFX.res();
     if(gs === 'menu' || controlMode === 'classic') return;
+    
+    if (e.touches.length > 1 && isAimingShot) {
+      mobShotIsLob = true;
+      toast("LOB SHOT SELECTED ⚽⬆️");
+    }
     
     for (let i = 0; i < e.changedTouches.length; i++) {
       const t = e.changedTouches[i];
