@@ -1088,7 +1088,7 @@ let goalTimer=0,koTimer=0,koTeam=0;
 let lastTS=0,accum=0;
 let human=null;
 let passHeld=false,tabHeld=false;
-let shtHeld=false,shtPow=0;
+let shtHeld=false,shtPow=0,passPow=0; let lastTeammateTapId=null,lastTeammateTapTime=0;
 let sprintMob=false;
 let controlMode='gestures';
 let halfFired=false;
@@ -1554,13 +1554,37 @@ function procHuman(pl){
   if(keys['Tab']&&!tabHeld){tabHeld=true;pTgtIdx=(pTgtIdx+1)%Math.max(1,pTargets.length);SFX.select();}
   if(!keys['Tab'])tabHeld=false;
 
-  // SPACE pass/tackle
-  if(keys['Space']&&!passHeld){
-    passHeld=true;
-    if(hb){if(pl.role==='gk' && !curPTgt)gkClear(pl);else doPass(pl,curPTgt);}
-    else attemptTkl(pl);
+  // SPACE pass/tackle (Hold to charge lob)
+  if(hb){
+    if(keys['Space']&&!passHeld){
+      passHeld=true;
+      passPow=0;
+      document.getElementById('pwrMtr').style.visibility='visible';
+    }
+    if(passHeld&&keys['Space']){
+      passPow=Math.min(1,passPow+.035);
+      document.getElementById('pwrFill').style.height=(passPow*100)+'%';
+      if(Math.floor(passPow*10)%3===0)SFX.charge(passPow);
+    }
+    if(!keys['Space']&&passHeld){
+      passHeld=false;
+      document.getElementById('pwrMtr').style.visibility='hidden';
+      document.getElementById('pwrFill').style.height='0%';
+      if(pl.role==='gk' && !curPTgt) {
+        gkClear(pl);
+      } else {
+        const isLob = (passPow >= 0.3);
+        doPass(pl,curPTgt,isLob);
+      }
+      passPow=0;
+    }
+  } else {
+    if(keys['Space']&&!passHeld){
+      passHeld=true;
+      attemptTkl(pl);
+    }
+    if(!keys['Space'])passHeld=false;
   }
-  if(!keys['Space'])passHeld=false;
 
   // SHIFT hold = charge shot
   if(hb){
@@ -1579,7 +1603,9 @@ function procHuman(pl){
     if(!shk&&shtHeld){
       shtHeld=false;document.getElementById('pwrMtr').style.visibility='hidden';
       document.getElementById('pwrFill').style.height='0%';
-      doShoot(pl,shtPow);shtPow=0;
+      const isLob = (shtPow >= 0.3);
+      doShoot(pl,shtPow,isLob);
+      shtPow=0;
     }
   }else if(shtHeld){shtHeld=false;shtPow=0;document.getElementById('pwrMtr').style.visibility='hidden';}
 }
@@ -1588,13 +1614,17 @@ function procHuman(pl){
 // ═══════════════════════════════════════════════════════
 // PASSING & SHOOTING
 // ═══════════════════════════════════════════════════════
-function doPass(psr,forced){
+function doPass(psr,forced,lob=false){
   const tgt=forced||bestPTgt(psr);if(!tgt)return;
   const lt=dst(psr.x,psr.y,tgt.x,tgt.y)/CFG.passSpd;
   const px=tgt.x+tgt.vx*lt*.6,py=tgt.y+tgt.vy*lt*.6;
   const pdx=px-psr.x,pdy=py-psr.y,pd=Math.max(1,Math.sqrt(pdx*pdx+pdy*pdy));
   ball.vx=(pdx/pd)*CFG.passSpd*getSt(psr.team).pas; ball.vy=(pdy/pd)*CFG.passSpd*getSt(psr.team).pas;
-  ball.vz = 1.0 + Math.min(pd, 300)/300 * 1.8;
+  if (lob) {
+    ball.vz = 1.0 + Math.min(pd, 300)/300 * 2.8;
+  } else {
+    ball.vz = 0;
+  }
   ball.own=-1;ball.lt=psr.team;
   ball.relBy=psr.id;ball.relT=10;
   gT(psr.team).forEach(p=>p.lead=false);tgt.lead=true;
@@ -1615,7 +1645,7 @@ function bestPTgt(psr){
   });
   return best;
 }
-function doShoot(sh,pow=1){
+function doShoot(sh,pow=1,lob=false){
   const acc=clamp(.5+pow*.5,0,1);
   const gx = shotAimX;
   const gy = shotAimY;
@@ -1623,7 +1653,11 @@ function doShoot(sh,pow=1){
 
   ball.vx=(dx/d)*CFG.shootSpd*(.65+pow*.45)*getSt(sh.team).sht;
   ball.vy=(dy/d)*CFG.shootSpd*(.65+pow*.45)*getSt(sh.team).sht;
-  ball.vz = 2.0 + pow * 3.5;
+  if (lob) {
+    ball.vz = 2.0 + pow * 3.5;
+  } else {
+    ball.vz = 0;
+  }
 
   ball.own=-1;ball.lt=sh.team;
   ball.relBy=sh.id;ball.relT=10;
@@ -1882,15 +1916,31 @@ function aiCarr(p, team, opps) {
 }
 
 
+function distToSegment(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const l2 = dx * dx + dy * dy;
+  if (l2 === 0) return dst(px, py, x1, y1);
+  let t = ((px - x1) * dx + (py - y1) * dy) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return dst(px, py, x1 + t * dx, y1 + t * dy);
+}
+
+function isLaneBlocked(p1, p2) {
+  const opponents = gT(1 - p1.team);
+  for (let o of opponents) {
+    if (distToSegment(o.x, o.y, p1.x, p1.y, p2.x, p2.y) < 45) return true;
+  }
+  return false;
+}
+
 function aiSht(p){
   const gx=p.team===0?F.x+F.w:F.x;
   const gy=F.y+F.h/2+(rnd()-.5)*F.goalH*.55;
-  const dx=gx-p.x,dy=gy-p.y,d=Math.max(1,Math.sqrt(dx*dx+dy*dy));
-  ball.vx=(dx/d)*CFG.shootSpd;ball.vy=(dy/d)*CFG.shootSpd;
-  ball.own=-1;ball.lt=p.team;
-  for(let i=0;i<8;i++)parts.push(mkP(ball.x,ball.y,'rgba(255,255,255,.8)',2));
-  SFX.shoot();mSt.shots[p.team]++;
-  triggerCrowdGasp();
+  shotAimX = gx;
+  shotAimY = gy;
+  const d = dst(p.x, p.y, gx, gy);
+  const needsLob = (d > 200) && (rnd() < 0.65);
+  doShoot(p, 0.75 + rnd() * 0.25, needsLob);
 }
 
 function aiPos(p,team,opps){
@@ -1942,13 +1992,9 @@ function aiPos(p,team,opps){
 
 
 function aiPass(psr,tgt){
-  const d=dst(psr.x,psr.y,tgt.x,tgt.y),lt=d/CFG.passSpd;
-  const px=tgt.x+tgt.vx*lt*.5,py=tgt.y+tgt.vy*lt*.5;
-  const pdx=px-psr.x,pdy=py-psr.y,pd=Math.max(1,Math.sqrt(pdx*pdx+pdy*pdy));
-  ball.vx=(pdx/pd)*CFG.passSpd;ball.vy=(pdy/pd)*CFG.passSpd;
-  ball.own=-1;ball.lt=psr.team;
-  for(let i=0;i<4;i++)parts.push(mkP(ball.x,ball.y,'rgba(255,255,255,.4)',1));
-  SFX.kick();mSt.passes[psr.team]++;   tacMem[psr.team].passCount++;   tacMem[psr.team].passesTo[tgt.id] = (tacMem[psr.team].passesTo[tgt.id] || 0) + 1;
+  const d = dst(psr.x, psr.y, tgt.x, tgt.y);
+  const needsLob = (d > 220) || isLaneBlocked(psr, tgt);
+  doPass(psr, tgt, needsLob);
 }
 function aiChase(p){
   const ad=adapt();
@@ -2025,8 +2071,21 @@ function updBall(){
 }
 function chkGoals(){
   const gT2=F.y+F.h/2-F.goalH/2,gB=F.y+F.h/2+F.goalH/2;
-  if(ball.x<F.x&&ball.y>gT2&&ball.y<gB){score[1]++;trigGoal(1);}
-  else if(ball.x>F.x+F.w&&ball.y>gT2&&ball.y<gB){score[0]++;trigGoal(0);}
+  const bz = ball.z || 0;
+  if(ball.x<F.x&&ball.y>gT2&&ball.y<gB){
+    if (bz <= 22) {
+      score[1]++;trigGoal(1);
+    } else {
+      rstBall(0); // Out of bounds over crossbar
+    }
+  }
+  else if(ball.x>F.x+F.w&&ball.y>gT2&&ball.y<gB){
+    if (bz <= 22) {
+      score[0]++;trigGoal(0);
+    } else {
+      rstBall(1); // Out of bounds over crossbar
+    }
+  }
 }
 function chkOOB(){
   const gT2=F.y+F.h/2-F.goalH/2,gB=F.y+F.h/2+F.goalH/2;
@@ -2047,17 +2106,23 @@ function rstBall(team) {
 }
 
 function chkPickup(){
-if(ball.own>=0)return;
-const sp=Math.sqrt(ball.vx**2+ball.vy**2);
-if(sp>15)return;
-if(ball.relT>0)ball.relT--;
-let cl=null,cd=Infinity;
-players.forEach(p=>{
-if(ball.relT>0 && p.id===ball.relBy)return;
-const d=dst(p.x,p.y,ball.x,ball.y);
-if(d<CFG.catD+8 && d<cd){cd=d;cl=p;}
-});
-if(cl){ball.own=cl.id;ball.lt=cl.team;ball.vx=0;ball.vy=0;ball.z=0;ball.vz=0;for(let i=0;i<3;i++)parts.push(mkP(ball.x,ball.y,'rgba(255,255,255,.5)',1));}
+  if(ball.own>=0)return;
+  const sp=Math.sqrt(ball.vx**2+ball.vy**2);
+  if(sp>15)return;
+  if(ball.relT>0)ball.relT--;
+  let cl=null,cd=Infinity;
+  players.forEach(p=>{
+    if(ball.relT>0 && p.id===ball.relBy)return;
+    const d=dst(p.x,p.y,ball.x,ball.y);
+    if(d<CFG.catD+8 && d<cd){
+      const bz = ball.z || 0;
+      const canCatch = (p.role === 'gk') ? (bz <= 28) : (bz <= 8);
+      if (canCatch) {
+        cd=d;cl=p;
+      }
+    }
+  });
+  if(cl){ball.own=cl.id;ball.lt=cl.team;ball.vx=0;ball.vy=0;ball.z=0;ball.vz=0;for(let i=0;i<3;i++)parts.push(mkP(ball.x,ball.y,'rgba(255,255,255,.5)',1));}
 }
 function chkNearMiss(){
   if(nmCool>0){nmCool--;return;}
@@ -2860,8 +2925,10 @@ function initMobile(){
 
   function findTappedPlayer(canvasX, canvasY, teamId) {
     const teammates = gT(teamId).filter(p => p.role !== 'gk');
+    const targetX = (sidesSwitched && gs !== 'penalty') ? W - canvasX : canvasX;
+    const targetY = (sidesSwitched && gs !== 'penalty') ? H - canvasY : canvasY;
     for (let p of teammates) {
-      if (dst(p.x, p.y, canvasX, canvasY) < 45) { // 45px touch tolerance
+      if (dst(p.x, p.y, targetX, targetY) < 45) { // 45px touch tolerance
         return p;
       }
     }
@@ -2896,9 +2963,13 @@ function initMobile(){
         
         // Check if direct teammate tap pass
         const gCoords = getGameCoords(t.clientX, t.clientY);
-        const teammate = findTappedPlayer(gCoords.x, gCoords.y, 0);
+        const teammate = findTappedPlayer(gCoords.x, gCoords.y, human.team);
         if (teammate && human && ball.own === human.id) {
-          doPass(human, teammate);
+          const now = Date.now();
+          const isDoubleTap = (lastTeammateTapId === teammate.id && (now - lastTeammateTapTime) < 300);
+          lastTeammateTapId = teammate.id;
+          lastTeammateTapTime = now;
+          doPass(human, teammate, isDoubleTap);
           SFX.select();
           continue;
         }
@@ -2996,7 +3067,11 @@ function initMobile(){
               
               const direction = (sidesSwitched && gs !== 'penalty') ? -1 : 1;
               shotAimY = clamp(human.y + Math.tan(angle) * distToGoal * direction, F.y + F.h/2 - F.goalH/2 + 6, F.y + F.h/2 + F.goalH/2 - 6);
-              doShoot(human, 0.82);
+              
+              // Swipe speed or length determines if it is a lofted/lobbed shot
+              const speed = dist / duration;
+              const isLob = (speed > 0.45) || (dist > 75);
+              doShoot(human, 0.82, isLob);
             }
           } else {
             // Tap to pass/tackle
